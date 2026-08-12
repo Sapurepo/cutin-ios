@@ -26,13 +26,13 @@ struct CutinChip: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.x3)
                     .background(fill, in: .rect(cornerRadius: Radius.sm))
-                    .strokedBorder(RoundedRectangle(cornerRadius: Radius.sm), color: stroke)
+                    .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: stroke)
             case .capsule:
                 text
                     .padding(.horizontal, Spacing.x3)
                     .padding(.vertical, Spacing.x2)
                     .background(fill, in: .capsule)
-                    .strokedBorder(Capsule(), color: stroke)
+                    .tokenBorder(Capsule(), color: stroke)
             }
         }
         .buttonStyle(.plain)

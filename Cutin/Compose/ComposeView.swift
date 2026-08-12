@@ -131,7 +131,7 @@ struct ComposeView: View {
                 .lineLimit(1...3)
                 .padding(Spacing.x3)
                 .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
-                .strokedBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
+                .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
         }
     }
 

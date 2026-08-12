@@ -70,9 +70,9 @@ struct CaptureSetupView: View {
                         .padding(Spacing.x4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(palette.surface, in: .rect(cornerRadius: Radius.md))
-                        .strokedBorder(RoundedRectangle(cornerRadius: Radius.md),
-                                       color: option == mode ? palette.borderStrong : palette.border,
-                                       lineWidth: option == mode ? 1.5 : 1)
+                        .tokenBorder(RoundedRectangle(cornerRadius: Radius.md),
+                                     color: option == mode ? palette.borderStrong : palette.border,
+                                     lineWidth: option == mode ? 1.5 : 1)
                     }
                     .buttonStyle(.plain)
                 }

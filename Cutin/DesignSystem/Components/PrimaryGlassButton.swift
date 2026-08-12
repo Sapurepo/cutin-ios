@@ -1,5 +1,7 @@
 /* 주요 CTA 버튼 스타일 — `.buttonStyle(.glassProminent)` + tint 조합의 반복
- * (CaptureSetupView 촬영 시작, CaptureView 권한 허용) 통합. */
+ * (CaptureSetupView 촬영 시작, CaptureView 카메라 권한 허용) 통합.
+ * 권한 허용 버튼은 조상 `.tint(.white)`에 의존하고 있었는데, 통합하면서 tint를 호출부에
+ * 명시하게 했다 — 그래야 CTA 스타일을 바꿀 때 이 헬퍼만 grep하면 전부 잡힌다. */
 
 import SwiftUI
 
