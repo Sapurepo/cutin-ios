@@ -10,17 +10,26 @@
 import Observation
 import UIKit
 
-/// 인덱스를 잃고 파일에서 되살렸다는 기록. 사용자에게 "무엇이 복구되지 않았는지" 알리는 근거.
-struct IndexRecovery {
-    let recovered: Int
-    let quarantine: URL?
+/// 인덱스를 어떤 상태로 읽었는지. 화면이 사용자에게 설명할 근거이자, 쓰기를 막을 근거다.
+enum IndexStatus {
+    case ok
+    /// 인덱스를 잃어 사진에서 되살렸다. 캡션·보정은 복구되지 않는다.
+    /// `quarantine`이 있으면 손상된 원본을 그 경로에 보존했다는 뜻.
+    case recovered(count: Int, quarantine: URL?)
+    /// 인덱스 파일이 있는데 읽지 못했다 — 덮어쓰지 않고 쓰기를 막는다.
+    case unwritable
+}
+
+enum FeedStoreError: Error {
+    /// 목록을 읽을 수 없는 상태에서 쓰기를 시도했다. 쓰면 원본 인덱스를 잃는다.
+    case indexUnwritable
 }
 
 @MainActor
 @Observable
 final class FeedStore {
     private(set) var posts: [ComposedPost] = []
-    private(set) var recovery: IndexRecovery?
+    private(set) var indexStatus: IndexStatus = .ok
 
     private let files: PostFileStore
     private let index: LocalPostIndex
@@ -44,6 +53,10 @@ final class FeedStore {
             files.decode(name, maxPixel: maxPixel)
         }.value
 
+        // 셀이 화면을 벗어나며 취소된 뒤라면 캐시를 채우지 않는다. CGImageSource 디코드 자체는
+        // 중간에 끊을 수 없어 이미 끝난 작업이고, 여기서 막는 건 뒤이은 상태 갱신뿐이다.
+        guard !Task.isCancelled else { return nil }
+
         if let decoded {
             cache.store(decoded, for: name, maxPixel: maxPixel)
         }
@@ -53,7 +66,6 @@ final class FeedStore {
     // MARK: - 쓰기
 
     /// 합성 결과를 저장하고 피드 맨 앞에 붙인다.
-    @discardableResult
     func save(
         image: UIImage,
         count: CutCount,
@@ -61,7 +73,9 @@ final class FeedStore {
         frameID: String?,
         filterID: FilterID,
         caption: String
-    ) throws -> ComposedPost {
+    ) throws {
+        try requireWritableIndex()
+
         let id = UUID()
         let name = files.filename(for: id)
         try files.write(image, to: name)
@@ -86,16 +100,27 @@ final class FeedStore {
             throw error
         }
         posts = updated
-        return post
     }
 
     func delete(_ post: ComposedPost) throws {
+        try requireWritableIndex()
+
         let remaining = posts.filter { $0.id != post.id }
         // 인덱스를 먼저 쓴다. 여기서 죽으면 파일이 고아로 남을 뿐 목록은 온전하다.
         // 반대 순서면 파일은 없는데 목록에는 남아 빈 카드가 생긴다.
         try index.save(remaining)
         posts = remaining
         try? files.remove(post.imageFilename)
+        cache.remove(post.imageFilename)
+    }
+
+    /// 복구 안내를 사용자가 확인했다. 쓰기 금지 상태(`unwritable`)는 사용자가 닫을 수 있는 게 아니다.
+    func acknowledgeRecovery() {
+        if case .recovered = indexStatus { indexStatus = .ok }
+    }
+
+    private func requireWritableIndex() throws {
+        if case .unwritable = indexStatus { throw FeedStoreError.indexUnwritable }
     }
 
     // MARK: - 영속화
@@ -107,32 +132,35 @@ final class FeedStore {
             // 봉투 없는 옛 형식이었으면 현재 스키마로 다시 써 둔다.
             if migrated { try? index.save(posts) }
 
-        case .corrupt(let quarantine):
-            recover(quarantine: quarantine)
+        /* 손상된 원본은 이미 격리됐다 — 되살린 게 0장이어도 상태를 알린다.
+         * 조용히 빈 피드를 보여주면 사용자는 목록이 사라진 이유를 알 방법이 없다. */
+        case .quarantined(let url):
+            posts = rebuildFromFiles()
+            indexStatus = .recovered(count: posts.count, quarantine: url)
+            try? index.save(posts)
 
         /* 파일이 없다 — 첫 실행이면 사진도 없어서 복구가 빈 목록을 낸다.
          * 사진이 있는데 인덱스만 없다면 인덱스를 잃은 것이다: 전부 삭제한 경우라면
          * `delete()`가 빈 목록을 **쓰기** 때문에 파일이 사라지지는 않는다. 그래서 여기서
          * 사진을 주워도 삭제한 포스트가 되살아나지 않는다. */
         case .absent:
-            recover(quarantine: nil)
+            posts = rebuildFromFiles()
+            guard !posts.isEmpty else { return }
+            indexStatus = .recovered(count: posts.count, quarantine: nil)
+            try? index.save(posts)
+
+        // 읽지 못한 원본이 제자리에 있다. 목록은 못 보여주지만 덮어쓰지도 않는다.
+        case .unwritable:
+            posts = []
+            indexStatus = .unwritable
         }
-    }
-
-    private func recover(quarantine: URL?) {
-        let rebuilt = rebuildFromFiles()
-        posts = rebuilt
-        guard !rebuilt.isEmpty else { return }
-
-        recovery = IndexRecovery(recovered: rebuilt.count, quarantine: quarantine)
-        try? index.save(rebuilt)
     }
 
     /* 인덱스를 잃었을 때 JPEG에서 목록을 되살린다. 사진은 사용자가 유일하게 잃으면 안 되는
      * 것이라 "빈 목록으로 시작"보다 이게 맞다.
      *
-     * 캡션·보정·레이아웃·컷 수는 인덱스에만 있던 메타데이터라 복구되지 않는다 — 아래 값들은
-     * 복구 불가를 뜻하는 자리값이고, 화면에 렌더되는 것은 보정 뱃지(.original이면 숨김)뿐이다. */
+     * 캡션·보정·레이아웃·컷 수는 인덱스에만 있던 메타데이터라 복구되지 않는다. 아래 값들은
+     * 자리값이고, 진짜 값으로 오해되지 않도록 `recoveredFromFile`로 표시해 파일에 남긴다. */
     private func rebuildFromFiles() -> [ComposedPost] {
         guard let names = try? files.storedNames() else { return [] }
         let suffix = ".\(PostFileStore.fileExtension)"
@@ -150,7 +178,8 @@ final class FeedStore {
                     layout: .grid2x2,
                     frameID: nil,
                     filterID: .original,
-                    caption: ""
+                    caption: "",
+                    recoveredFromFile: true
                 )
             }
             .sorted { $0.createdAt > $1.createdAt }

@@ -48,4 +48,8 @@ struct ComposedPost: Identifiable, Codable, Sendable {
     let frameID: String?
     let filterID: FilterID
     var caption: String
+    /// 인덱스를 잃고 JPEG에서 되살린 레코드 표시. 이때 `count`·`layout`·`frameID`·`filterID`는
+    /// 인덱스에만 있던 값이라 복구되지 않고 자리값이 들어간다 — 그 값을 진짜로 오해하지 않도록
+    /// 파일에 흔적을 남긴다. 없는 키는 nil로 읽히므로 기존 인덱스와 호환된다.
+    var recoveredFromFile: Bool?
 }

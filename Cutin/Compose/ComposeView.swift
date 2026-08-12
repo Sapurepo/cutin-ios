@@ -22,6 +22,7 @@ struct ComposeView: View {
     @State private var preview: UIImage?
     @State private var isRendering = false
     @State private var isSaving = false
+    @State private var saveFailed = false
 
     private static let previewWidth: CGFloat = 540
 
@@ -36,6 +37,7 @@ struct ComposeView: View {
                 templateStrip
                 filterStrip
                 captionField
+                if saveFailed { saveFailureNotice }
             }
             .padding(.horizontal, Spacing.x4)
             .padding(.bottom, Spacing.x12)
@@ -59,6 +61,15 @@ struct ComposeView: View {
 
     /// 프리뷰 재렌더 트리거 — 템플릿·필터가 바뀔 때만 다시 굽는다.
     private var renderKey: String { "\(template.id)-\(filter.rawValue)" }
+
+    /* 저장 실패를 화면에 남긴다. 실패해도 화면이 그대로면 사용자는 저장 버튼이 죽은 줄 알고
+     * 닫기를 누르고, 그러면 찍은 컷이 사라진다. 문구·재시도 다듬기는 편집 3단계 브랜치 몫. */
+    private var saveFailureNotice: some View {
+        Text("저장하지 못했어요. 저장 공간을 확인하고 다시 시도해 주세요")
+            .font(Typography.caption)
+            .foregroundStyle(palette.danger)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     // MARK: - 미리보기
 
@@ -166,6 +177,7 @@ struct ComposeView: View {
     private func save() {
         guard !isSaving else { return }
         isSaving = true
+        saveFailed = false
 
         let req = request(outputWidth: 1080)
         Task {
@@ -184,8 +196,8 @@ struct ComposeView: View {
                 )
                 onSaved()
             } catch {
-                // 실패했는데 피드로 넘어가면 사용자는 저장됐다고 믿는다. 여기 머무는 것만 지키고
-                // 배너·재시도는 편집 3단계 브랜치에서 붙인다.
+                // 실패했는데 피드로 넘어가면 사용자는 저장됐다고 믿는다.
+                saveFailed = true
             }
             isSaving = false
         }

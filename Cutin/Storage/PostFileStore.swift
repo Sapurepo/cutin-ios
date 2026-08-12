@@ -31,10 +31,6 @@ struct PostFileStore: Sendable {
         try vault.remove(name)
     }
 
-    func exists(_ name: String) -> Bool {
-        vault.exists(name)
-    }
-
     func storedNames() throws -> [String] {
         try vault.names(withExtension: Self.fileExtension)
     }

@@ -27,14 +27,19 @@ struct LocalPostIndex: Sendable {
     enum Outcome {
         /// 정상 로드 (봉투 없는 v0에서 올라온 경우 `migrated == true`)
         case loaded([ComposedPost], migrated: Bool)
-        /// 파일이 아직 없다 — 첫 실행
+        /// 파일이 없다 — 첫 실행이거나 인덱스를 잃었다. 새로 써도 잃을 게 없다
         case absent
-        /// 디코드 실패. 원본은 `quarantine` 경로로 옮겨 뒀다
-        case corrupt(quarantine: URL?)
+        /// 디코드 실패. 원본을 이 경로로 치워 뒀으므로 새로 써도 안전하다
+        case quarantined(URL)
+        /* 파일이 있는데 읽지 못했거나(일시적 I/O·데이터 보호 잠금) 치우지도 못했다.
+         * **덮어쓰면 안 되는 상태** — 다음 실행에 성공할 수 있는 원본이 그대로 남아 있다. */
+        case unwritable
     }
 
     func load() -> Outcome {
-        guard vault.exists(name), let data = try? vault.read(name) else { return .absent }
+        guard vault.exists(name) else { return .absent }
+        // 읽기 실패를 `.absent`로 뭉개면 온전한 인덱스를 자리값으로 덮어쓴다.
+        guard let data = try? vault.read(name) else { return .unwritable }
 
         let decoder = FileVault.decoder()
         if let envelope = try? decoder.decode(Envelope.self, from: data) {
@@ -44,7 +49,11 @@ struct LocalPostIndex: Sendable {
         if let posts = try? decoder.decode([ComposedPost].self, from: data) {
             return .loaded(posts, migrated: true)
         }
-        return .corrupt(quarantine: try? vault.moveAside(name, suffix: "corrupt"))
+        // 치우기에 실패하면 원본이 제자리에 남는다 — 그때 새로 쓰면 지키려던 바이트가 사라진다.
+        guard let quarantine = try? vault.moveAside(name, suffix: "corrupt") else {
+            return .unwritable
+        }
+        return .quarantined(quarantine)
     }
 
     func save(_ posts: [ComposedPost]) throws {
