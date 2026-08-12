@@ -35,6 +35,9 @@ struct FeedView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: Spacing.x6) {
+                if let recovery = store.recovery {
+                    recoveryNotice(recovery)
+                }
                 ForEach(store.posts) { post in
                     card(post)
                         .onTapGesture { selected = post }
@@ -45,14 +48,28 @@ struct FeedView: View {
         }
     }
 
+    /// 인덱스를 잃고 사진에서 목록을 되살린 경우 — 조용히 넘어가면 사용자는 캡션이 왜 사라졌는지 모른다.
+    /// 격리 파일이 있으면 "손상", 없으면 목록 파일 자체가 사라진 것이다.
+    private func recoveryNotice(_ recovery: IndexRecovery) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.x1) {
+            Text(recovery.quarantine == nil
+                 ? "목록 파일이 없어 사진 \(recovery.recovered)장에서 복구했어요"
+                 : "목록이 손상돼 사진 \(recovery.recovered)장에서 복구했어요")
+                .font(Typography.bodyText)
+                .foregroundStyle(palette.textPrimary)
+            Text("캡션과 보정 정보는 복구되지 않았어요")
+                .font(Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.x3)
+        .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
+        .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
+    }
+
     private func card(_ post: ComposedPost) -> some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
-            if let image = store.image(for: post) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(.rect(cornerRadius: Radius.md))
-            }
+            PostImage(post: post)
 
             HStack(spacing: Spacing.x2) {
                 Text(post.createdAt, format: .dateTime.year().month().day())
@@ -79,12 +96,8 @@ struct FeedView: View {
     private func detail(_ post: ComposedPost) -> some View {
         NavigationStack {
             ScrollView {
-                if let image = store.image(for: post) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(Spacing.x4)
-                }
+                PostImage(post: post)
+                    .padding(Spacing.x4)
             }
             .background(palette.bg)
             .navigationTitle("포스트")
@@ -92,11 +105,46 @@ struct FeedView: View {
             .toolbar {
                 ToolbarItem(placement: .destructiveAction) {
                     Button("삭제", role: .destructive) {
-                        store.delete(post)
+                        // 삭제 실패는 인덱스가 온전하다는 뜻이라 목록도 그대로 둔다.
+                        // 사용자에게 알리는 배너는 하드닝 브랜치에서 붙인다.
+                        try? store.delete(post)
                         selected = nil
                     }
                 }
             }
+        }
+    }
+}
+
+/* 포스트 이미지 — 디코드를 메인 액터 밖으로 보내고 자리를 먼저 잡는다.
+ * 카드와 상세가 같은 크기(저장 해상도)를 쓰므로 캐시 항목도 하나로 공유된다. */
+private struct PostImage: View {
+    let post: ComposedPost
+
+    @Environment(FeedStore.self) private var store
+    @Environment(\.palette) private var palette
+
+    @State private var image: UIImage?
+
+    /// 합성 출력 폭과 같다 — 이보다 크게 요청해도 없는 픽셀이 생기지 않는다.
+    private static let maxPixel: CGFloat = 1080
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                // 로드 전 레이아웃이 튀지 않게 정사각으로 자리를 잡는다 (템플릿 대부분이 1:1).
+                RoundedRectangle(cornerRadius: Radius.md)
+                    .fill(palette.surfaceSunken)
+                    .aspectRatio(1, contentMode: .fit)
+            }
+        }
+        .clipShape(.rect(cornerRadius: Radius.md))
+        .task(id: post.id) {
+            image = await store.image(for: post, maxPixel: Self.maxPixel)
         }
     }
 }

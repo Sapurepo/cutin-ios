@@ -173,16 +173,21 @@ struct ComposeView: View {
                 CutCompositor.render(req)
             }.value
 
-            store.save(
-                image: baked,
-                count: count,
-                layout: template.layout,
-                frameID: template.frame?.id,
-                filterID: filter,
-                caption: caption
-            )
+            do {
+                try store.save(
+                    image: baked,
+                    count: count,
+                    layout: template.layout,
+                    frameID: template.frame?.id,
+                    filterID: filter,
+                    caption: caption
+                )
+                onSaved()
+            } catch {
+                // 실패했는데 피드로 넘어가면 사용자는 저장됐다고 믿는다. 여기 머무는 것만 지키고
+                // 배너·재시도는 편집 3단계 브랜치에서 붙인다.
+            }
             isSaving = false
-            onSaved()
         }
     }
 }
