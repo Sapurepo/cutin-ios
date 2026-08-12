@@ -120,7 +120,7 @@ struct CaptureView: View {
     private var permissionBox: some View {
         VStack(spacing: Spacing.x4) {
             Text("컷 촬영을 위해\n카메라 권한이 필요해요")
-                .font(Typography.font(.body, .semibold, size: 15))
+                .font(Typography.buttonLabel)
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
@@ -132,7 +132,7 @@ struct CaptureView: View {
                 .buttonStyle(.glass)
             } else {
                 Button("카메라 권한 허용") { camera.start() }
-                    .buttonStyle(.glassProminent)
+                    .primaryGlassButton(tint: .white)
             }
         }
         .padding(Spacing.x6)
@@ -161,13 +161,9 @@ struct CaptureView: View {
                     }
                     .frame(width: 40, height: 40)
                     .clipShape(.rect(cornerRadius: 8))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                isRetake || isNext ? Color.white : Color(hex: 0x2C2C30),
-                                lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1)
-                            )
-                    }
+                    .tokenBorder(RoundedRectangle(cornerRadius: 8),
+                                 color: isRetake || isNext ? Color.white : Color(hex: 0x2C2C30),
+                                 lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1))
                 }
                 .buttonStyle(.plain)
                 .disabled(!filled)

@@ -33,22 +33,9 @@ struct CaptureSetupView: View {
 
             HStack(spacing: Spacing.x2) {
                 ForEach(CutCount.allCases) { option in
-                    Button {
+                    CutinChip(label: option.label, selected: option == count, style: .block) {
                         count = option
-                    } label: {
-                        Text(option.label)
-                            .font(Typography.chip)
-                            .foregroundStyle(option == count ? palette.accentOn : palette.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.x3)
-                            .background(option == count ? palette.accent : palette.surface,
-                                        in: .rect(cornerRadius: Radius.sm))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: Radius.sm)
-                                    .stroke(option == count ? .clear : palette.border, lineWidth: 1)
-                            }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -68,7 +55,7 @@ struct CaptureSetupView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(option.label)
-                                    .font(Typography.font(.body, .semibold, size: 15))
+                                    .font(Typography.buttonLabel)
                                     .foregroundStyle(palette.textPrimary)
                                 Text(option.hint)
                                     .font(Typography.caption)
@@ -83,11 +70,9 @@ struct CaptureSetupView: View {
                         .padding(Spacing.x4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(palette.surface, in: .rect(cornerRadius: Radius.md))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Radius.md)
-                                .stroke(option == mode ? palette.borderStrong : palette.border,
-                                        lineWidth: option == mode ? 1.5 : 1)
-                        }
+                        .tokenBorder(RoundedRectangle(cornerRadius: Radius.md),
+                                     color: option == mode ? palette.borderStrong : palette.border,
+                                     lineWidth: option == mode ? 1.5 : 1)
                     }
                     .buttonStyle(.plain)
                 }
@@ -101,11 +86,10 @@ struct CaptureSetupView: View {
             onStart()
         } label: {
             Text("촬영 시작")
-                .font(Typography.font(.body, .semibold, size: 15))
+                .font(Typography.buttonLabel)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.x4)
         }
-        .buttonStyle(.glassProminent)
-        .tint(palette.accent)
+        .primaryGlassButton(tint: palette.accent)
     }
 }

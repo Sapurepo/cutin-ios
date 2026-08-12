@@ -68,9 +68,7 @@ struct FeedView: View {
                         .foregroundStyle(palette.textSecondary)
                         .padding(.horizontal, Spacing.x2)
                         .padding(.vertical, 2)
-                        .overlay {
-                            Capsule().stroke(palette.border, lineWidth: 1)
-                        }
+                        .tokenBorder(Capsule(), color: palette.border)
                 }
             }
 

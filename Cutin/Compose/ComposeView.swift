@@ -87,7 +87,7 @@ struct ComposeView: View {
     private var templateStrip: some View {
         section("템플릿") {
             ForEach(availableTemplates) { item in
-                chip(label: item.name, selected: item.id == template.id) {
+                CutinChip(label: item.name, selected: item.id == template.id) {
                     template = item
                 }
             }
@@ -97,7 +97,7 @@ struct ComposeView: View {
     private var filterStrip: some View {
         section("보정") {
             ForEach(FilterID.allCases) { item in
-                chip(label: item.displayName, selected: item == filter) {
+                CutinChip(label: item.displayName, selected: item == filter) {
                     filter = item
                 }
             }
@@ -121,21 +121,6 @@ struct ComposeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func chip(label: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(Typography.chip)
-                .foregroundStyle(selected ? palette.accentOn : palette.textPrimary)
-                .padding(.horizontal, Spacing.x3)
-                .padding(.vertical, Spacing.x2)
-                .background(selected ? palette.accent : palette.surface, in: .capsule)
-                .overlay {
-                    Capsule().stroke(selected ? .clear : palette.border, lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-    }
-
     private var captionField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("캡션")
@@ -146,9 +131,7 @@ struct ComposeView: View {
                 .lineLimit(1...3)
                 .padding(Spacing.x3)
                 .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
-                .overlay {
-                    RoundedRectangle(cornerRadius: Radius.sm).stroke(palette.border, lineWidth: 1)
-                }
+                .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
         }
     }
 
