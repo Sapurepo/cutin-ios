@@ -138,8 +138,9 @@ struct CaptureView: View {
         switch error {
         case .notReady: return "카메라가 준비되지 않았어요. 잠시 후 다시 눌러주세요"
         case .busy: return "이전 컷을 저장하는 중이에요"
-        case .noImageData, .timedOut: return "촬영에 실패했어요. 다시 눌러주세요"
-        case .cancelled: return "촬영이 중단됐어요"
+        case .interrupted: return "촬영이 중단됐어요. 카메라가 돌아오면 이어서 찍을 수 있어요"
+        // .cancelled는 사용자가 접은 경우라 이 함수까지 오지 않는다(shoot에서 걸러진다).
+        case .noImageData, .timedOut, .cancelled: return "촬영에 실패했어요. 다시 눌러주세요"
         }
     }
 
@@ -205,8 +206,10 @@ struct CaptureView: View {
 
     /// 눌러도 되는 조건을 한 곳에 둔다 — 이전 구현은 `disabled`에는 `isShooting`이 있고
     /// `opacity`에는 없어서 촬영 중에 눌리지 않는 셔터가 멀쩡해 보였다.
+    /// `isRunning`까지 봐야 한다: 인터럽션으로 세션이 내려가면 프리뷰는 검은데 셔터만 멀쩡해
+    /// 보이고, 누를 때마다 실패 문구가 뜬다.
     private var canShoot: Bool {
-        camera.permission == .granted && countdown == nil && !isShooting
+        camera.permission == .granted && camera.isRunning && countdown == nil && !isShooting
     }
 
     private var shutterRow: some View {
