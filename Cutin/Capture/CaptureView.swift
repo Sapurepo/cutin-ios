@@ -8,12 +8,13 @@ struct CaptureView: View {
     @Bindable var flow: CaptureFlow
     let onComplete: () -> Void
 
-    @StateObject private var camera = CameraController()
+    @State private var camera = CameraController()
     @Environment(\.dismiss) private var dismiss
 
     @State private var countdown: Int?
     @State private var countdownTask: Task<Void, Never>?
     @State private var isShooting = false
+    @State private var failure: CameraController.CaptureError?
 
     private let ink = Palette.dark
 
@@ -78,7 +79,8 @@ struct CaptureView: View {
 
                 if let countdown {
                     ZStack {
-                        Color(hex: 0x0A0A0B, alpha: 0.25)
+                        // 0x0A0A0B@0.25였다 — 잉크 배경과 같은 값이라 토큰으로 바꾼다.
+                        ink.bg.opacity(0.25)
                         Text("\(countdown)")
                             .font(Typography.font(.latin, .semibold, size: 96))
                             .foregroundStyle(.white)
@@ -89,6 +91,9 @@ struct CaptureView: View {
 
                 VStack {
                     Spacer()
+                    if let failure {
+                        failureLabel(failure)
+                    }
                     Text(counterLabel)
                         .font(flow.retakeIndex != nil
                               ? Typography.font(.body, .medium, size: 15)
@@ -100,7 +105,7 @@ struct CaptureView: View {
                         .padding(.bottom, Spacing.x3)
                 }
 
-            case .unknown, .denied:
+            case .needsRequest, .denied:
                 permissionBox
             }
         }
@@ -117,6 +122,27 @@ struct CaptureView: View {
         return "\(flow.nextSlot) / \(flow.count.rawValue)"
     }
 
+    /* 촬영 실패를 조용히 넘기면 사용자는 셔터가 고장 난 줄 안다 — 이전 구현은 `try?`로 삼켰다.
+     * 문구를 배너 컴포넌트로 통일하는 일은 편집 3단계 브랜치에서 한다. */
+    private func failureLabel(_ error: CameraController.CaptureError) -> some View {
+        Text(message(for: error))
+            .font(Typography.chip)
+            .foregroundStyle(.white)
+            .padding(.horizontal, Spacing.x3)
+            .padding(.vertical, Spacing.x2)
+            .background(ink.danger.opacity(0.9), in: .capsule)
+            .padding(.bottom, Spacing.x2)
+    }
+
+    private func message(for error: CameraController.CaptureError) -> String {
+        switch error {
+        case .notReady: return "카메라가 준비되지 않았어요. 잠시 후 다시 눌러주세요"
+        case .busy: return "이전 컷을 저장하는 중이에요"
+        case .noImageData, .timedOut: return "촬영에 실패했어요. 다시 눌러주세요"
+        case .cancelled: return "촬영이 중단됐어요"
+        }
+    }
+
     private var permissionBox: some View {
         VStack(spacing: Spacing.x4) {
             Text("컷 촬영을 위해\n카메라 권한이 필요해요")
@@ -124,7 +150,8 @@ struct CaptureView: View {
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
-            if case .denied(let canAskAgain) = camera.permission, !canAskAgain {
+            if camera.permission == .denied {
+                // iOS는 한 번 거부된 뒤 앱이 다시 묻는 것을 허용하지 않는다.
                 Button("설정에서 허용") {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     UIApplication.shared.open(url)
@@ -152,7 +179,8 @@ struct CaptureView: View {
                     flow.toggleRetake(index)
                 } label: {
                     ZStack {
-                        Color(hex: 0x232327)
+                        // 0x232327 = 잉크 팔레트의 border와 같은 값이었다.
+                        ink.border
                         if filled {
                             Image(uiImage: flow.cuts[index])
                                 .resizable()
@@ -162,7 +190,7 @@ struct CaptureView: View {
                     .frame(width: 40, height: 40)
                     .clipShape(.rect(cornerRadius: 8))
                     .tokenBorder(RoundedRectangle(cornerRadius: 8),
-                                 color: isRetake || isNext ? Color.white : Color(hex: 0x2C2C30),
+                                 color: isRetake || isNext ? Color.white : ink.borderStrong,
                                  lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1))
                 }
                 .buttonStyle(.plain)
@@ -175,6 +203,12 @@ struct CaptureView: View {
 
     // MARK: - 셔터
 
+    /// 눌러도 되는 조건을 한 곳에 둔다 — 이전 구현은 `disabled`에는 `isShooting`이 있고
+    /// `opacity`에는 없어서 촬영 중에 눌리지 않는 셔터가 멀쩡해 보였다.
+    private var canShoot: Bool {
+        camera.permission == .granted && countdown == nil && !isShooting
+    }
+
     private var shutterRow: some View {
         Button(action: onShutter) {
             Circle()
@@ -185,8 +219,8 @@ struct CaptureView: View {
                 }
         }
         .buttonStyle(.plain)
-        .disabled(camera.permission != .granted || countdown != nil || isShooting)
-        .opacity(camera.permission != .granted || countdown != nil ? 0.4 : 1)
+        .disabled(!canShoot)
+        .opacity(canShoot ? 1 : 0.4)
         .accessibilityLabel("촬영")
         .padding(.top, Spacing.x2)
         .padding(.bottom, Spacing.x8)
@@ -195,7 +229,9 @@ struct CaptureView: View {
     // MARK: - 촬영 동작
 
     private func onShutter() {
-        guard countdown == nil else { return }
+        guard canShoot else { return }
+        failure = nil
+
         if flow.mode == .burst, flow.retakeIndex == nil {
             countdownTask = Task { await runBurst() }
         } else {
@@ -213,18 +249,29 @@ struct CaptureView: View {
             }
             if Task.isCancelled { break }
             countdown = nil
-            await shoot()
+
+            // 실패하면 멈춘다. 이전 구현은 실패를 삼키고 루프를 계속 돌아, 카메라가 못 찍는
+            // 상황에서 컷 수가 늘지 않는 카운트다운을 영원히 반복했다.
+            guard await shoot() else { break }
         }
         countdown = nil
     }
 
-    private func shoot() async {
-        guard !isShooting else { return }
+    @discardableResult
+    private func shoot() async -> Bool {
+        guard !isShooting else { return false }
         isShooting = true
         defer { isShooting = false }
 
-        if let image = try? await camera.capturePhoto() {
-            flow.addCut(image)
+        do {
+            flow.addCut(try await camera.capturePhoto())
+            return true
+        } catch CameraController.CaptureError.cancelled {
+            // 화면을 벗어났거나 전/후면을 바꿨다 — 사용자에게 알릴 실패가 아니다.
+            return false
+        } catch {
+            failure = error as? CameraController.CaptureError ?? .noImageData
+            return false
         }
     }
 }
