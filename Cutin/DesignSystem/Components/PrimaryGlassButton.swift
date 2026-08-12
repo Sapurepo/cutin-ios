@@ -17,7 +17,7 @@ extension View {
             let palette = Palette.of(scheme)
             Button {} label: {
                 Text("촬영 시작")
-                    .font(Typography.font(.body, .semibold, size: 15))
+                    .font(Typography.buttonLabel)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.x4)
             }
