@@ -161,13 +161,9 @@ struct CaptureView: View {
                     }
                     .frame(width: 40, height: 40)
                     .clipShape(.rect(cornerRadius: 8))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                isRetake || isNext ? Color.white : Color(hex: 0x2C2C30),
-                                lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1)
-                            )
-                    }
+                    .strokedBorder(RoundedRectangle(cornerRadius: 8),
+                                   color: isRetake || isNext ? Color.white : Color(hex: 0x2C2C30),
+                                   lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1))
                 }
                 .buttonStyle(.plain)
                 .disabled(!filled)
