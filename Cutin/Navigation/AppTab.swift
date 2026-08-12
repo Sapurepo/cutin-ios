@@ -1,17 +1,13 @@
 /* 탭 정의 — 명세 §4.2의 5탭. 가운데 항목은 화면이 아니라 **액션**(촬영 시트 열기)이라
  * `isAction`으로 구분한다. SwiftUI의 `Tab` 뷰와 이름이 겹치지 않도록 AppTab으로 둔다. */
 
-import Foundation
-
-enum AppTab: Hashable, CaseIterable, Identifiable {
+enum AppTab: Hashable {
     case home
     case friends
-    /// 중앙 강조 CTA — 선택되는 탭이 아니라 촬영 시트를 여는 트리거
+    /// 중앙 강조 CTA — 선택되는 탭이 아니라 촬영 플로우를 여는 트리거
     case capture
     case profile
     case archive
-
-    var id: Self { self }
 
     var title: String {
         switch self {

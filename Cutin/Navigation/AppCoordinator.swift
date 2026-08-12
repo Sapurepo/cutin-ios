@@ -33,14 +33,19 @@ final class AppCoordinator {
         isCapturePresented = true
     }
 
+    /// 같은 단계를 두 번 밀지 않는다 — 애니메이션이 끝나기 전 연타하면 CaptureView가 둘 쌓이고
+    /// 각자 AVCaptureSession을 시작해 카메라를 다툰다. 이전 구현이 경로를 통째로 대입해
+    /// 우연히 멱등이었던 성질을 여기서 명시적으로 지킨다.
     func advanceCapture(to step: CaptureStep) {
+        guard capturePath.last != step else { return }
         capturePath.append(step)
     }
 
-    /// 저장 완료 — 시트를 닫고 결과가 보이는 홈으로 돌려보낸다.
+    /// 저장 완료 — 커버를 닫고 결과가 보이는 홈으로 돌려보낸다.
+    /// 경로는 비우지 않는다. 닫히는 프레임에 NavigationStack을 루트로 되돌리라고 시키면
+    /// 전환이 튀고, 다음 `startCapture()`가 어차피 초기화한다.
     func finishCapture() {
         isCapturePresented = false
-        capturePath = []
         tab = .home
     }
 }
