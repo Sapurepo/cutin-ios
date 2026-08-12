@@ -55,7 +55,7 @@ struct CaptureSetupView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(option.label)
-                                    .font(Typography.font(.body, .semibold, size: 15))
+                                    .font(Typography.buttonLabel)
                                     .foregroundStyle(palette.textPrimary)
                                 Text(option.hint)
                                     .font(Typography.caption)
@@ -86,7 +86,7 @@ struct CaptureSetupView: View {
             onStart()
         } label: {
             Text("촬영 시작")
-                .font(Typography.font(.body, .semibold, size: 15))
+                .font(Typography.buttonLabel)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.x4)
         }

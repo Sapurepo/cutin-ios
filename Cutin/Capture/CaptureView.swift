@@ -120,7 +120,7 @@ struct CaptureView: View {
     private var permissionBox: some View {
         VStack(spacing: Spacing.x4) {
             Text("컷 촬영을 위해\n카메라 권한이 필요해요")
-                .font(Typography.font(.body, .semibold, size: 15))
+                .font(Typography.buttonLabel)
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 

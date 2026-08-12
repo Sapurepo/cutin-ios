@@ -38,6 +38,9 @@ enum Typography {
     static let caption = font(.body, .regular, size: 11)
     static let numeric = font(.latin, .medium, size: 15)
     static let chip = font(.body, .medium, size: 12)
+    /// 버튼·강조 라벨 — 원본 스케일에 없어 `font(.body, .semibold, size: 15)` 인라인 호출이
+    /// 3곳(촬영 시작·촬영 방식·권한 안내)에 반복되던 것을 승격
+    static let buttonLabel = font(.body, .semibold, size: 15)
 
     /// 로고 트래킹 — 원본 `typeScale.logo.tracking = 0.02em`
     static let logoTracking: CGFloat = 18 * 0.02
