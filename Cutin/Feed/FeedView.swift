@@ -25,15 +25,11 @@ struct FeedView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.x3) {
-            Text("아직 남긴 컷이 없어요")
-                .font(Typography.headline)
-                .foregroundStyle(palette.textPrimary)
-            Text("촬영 탭에서 첫 컷을 찍어보세요")
-                .font(Typography.bodyText)
-                .foregroundStyle(palette.textSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyStateView(
+            title: "아직 남긴 컷이 없어요",
+            message: "가운데 촬영 버튼으로 첫 컷을 찍어보세요",
+            systemImage: AppTab.home.systemImage
+        )
     }
 
     private var list: some View {
