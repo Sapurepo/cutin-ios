@@ -17,8 +17,6 @@ struct Palette {
     let accent: Color
     let accentOn: Color
     let danger: Color
-    let scrim: Color
-    let overlay: Color
 
     static let light = Palette(
         bg: Color(hex: 0xFAFAF8),
@@ -30,9 +28,7 @@ struct Palette {
         textSecondary: Color(hex: 0x9A9A95),
         accent: Color(hex: 0x0A0A0B),
         accentOn: Color(hex: 0xFFFFFF),
-        danger: Color(hex: 0xFF3B30),
-        scrim: Color(hex: 0x0A0A0B, alpha: 0.55),
-        overlay: Color(hex: 0x0A0A0B, alpha: 0.04)
+        danger: Color(hex: 0xFF3B30)
     )
 
     static let dark = Palette(
@@ -45,9 +41,7 @@ struct Palette {
         textSecondary: Color(hex: 0x7A7A7E),
         accent: Color(hex: 0xF5F5F4),
         accentOn: Color(hex: 0x0A0A0B),
-        danger: Color(hex: 0xFF453A),
-        scrim: Color(hex: 0x000000, alpha: 0.6),
-        overlay: Color(hex: 0xF5F5F4, alpha: 0.06)
+        danger: Color(hex: 0xFF453A)
     )
 
     static func of(_ scheme: ColorScheme) -> Palette {
@@ -59,7 +53,6 @@ struct Palette {
 
 /// 4px 기본 그리드. 원본의 숫자 키(`spacing[4]`)를 이름으로 옮겼다.
 enum Spacing {
-    static let x0: CGFloat = 0
     static let x1: CGFloat = 4
     static let x2: CGFloat = 8
     static let x3: CGFloat = 12
@@ -68,38 +61,24 @@ enum Spacing {
     static let x5: CGFloat = 20
     static let x6: CGFloat = 24
     static let x8: CGFloat = 32
-    static let x10: CGFloat = 40
-    static let x12: CGFloat = 48
 }
 
 enum Radius {
-    /// 칩, 작은 컨트롤
-    static let xs: CGFloat = 6
     /// 인풋, 버튼
     static let sm: CGFloat = 10
     /// 카드, 포스트
     static let md: CGFloat = 14
     /// 시트, 큰 미디어
     static let lg: CGFloat = 20
-    /// 캡슐 칩, 아바타, 촬영 FAB
-    static let pill: CGFloat = 999
 }
 
 enum Layout {
-    /// 모바일 캔버스 상한
-    static let appMaxWidth: CGFloat = 430
-    /// 하단 탭바
-    static let navHeight: CGFloat = 64
-    /// 상단 앱바
-    static let headerHeight: CGFloat = 52
     /// 최소 히트 타깃
     static let tapTarget: CGFloat = 44
 }
 
 enum Duration {
     static let fast: TimeInterval = 0.12
-    static let base: TimeInterval = 0.2
-    static let slow: TimeInterval = 0.32
 }
 
 // MARK: - Hex helper
