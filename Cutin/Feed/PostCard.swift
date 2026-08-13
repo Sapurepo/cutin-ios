@@ -8,7 +8,6 @@ import SwiftUI
 struct PostCard: View {
     let post: ComposedPost
 
-    @Environment(FeedStore.self) private var store
     @Environment(\.palette) private var palette
 
     var body: some View {

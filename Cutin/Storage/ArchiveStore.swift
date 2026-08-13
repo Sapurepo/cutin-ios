@@ -17,6 +17,11 @@ import Observation
 final class ArchiveStore {
     private(set) var ids: Set<UUID> = []
 
+    /* 파일이 **있는데 읽지 못한** 상태. 빈 집합으로 시작해 버리면 다음 toggle의 persist가
+     * 온전한 원본을 id 하나짜리로 덮어쓴다 — 포스트 인덱스가 하드닝된 것과 정확히 같은
+     * 소실 경로다(읽기 실패를 소실로 오해해 덮어쓰기). 이 상태에서는 쓰기를 전부 막는다. */
+    @ObservationIgnored private var isUnreadable = false
+
     @ObservationIgnored private let vault = FileVault.documents()
     @ObservationIgnored private static let name = "archive.json"
 
@@ -29,6 +34,7 @@ final class ArchiveStore {
     /// 보관 여부를 뒤집고 파일에 남긴다. 실패하면 메모리도 되돌린다 —
     /// 화면에는 보관됐는데 다음 실행에 사라지는 것이 조용히 실패하는 것보다 나쁘다.
     func toggle(_ id: UUID) {
+        guard !isUnreadable else { return }
         let previous = ids
         if ids.contains(id) { ids.remove(id) } else { ids.insert(id) }
         guard persist() else {
@@ -39,15 +45,21 @@ final class ArchiveStore {
 
     /// 포스트가 삭제되면 보관 기록도 의미가 없다. 남겨 두면 존재하지 않는 id가 파일에 쌓인다.
     func forget(_ id: UUID) {
-        guard ids.contains(id) else { return }
+        guard !isUnreadable, ids.contains(id) else { return }
         ids.remove(id)
         _ = persist()
     }
 
+    /* "파일 없음"과 "읽기 실패"를 가른다. 없음은 첫 실행이라 빈 집합이 맞고,
+     * 실패(잠긴 디스크·중간에 끊긴 쓰기)는 원본이 남아 있으므로 덮어쓰면 안 된다. */
     private func load() {
+        guard vault.exists(Self.name) else { return }
         guard let data = try? vault.read(Self.name),
               let stored = try? FileVault.decoder().decode([UUID].self, from: data)
-        else { return }
+        else {
+            isUnreadable = true
+            return
+        }
         ids = Set(stored)
     }
 
