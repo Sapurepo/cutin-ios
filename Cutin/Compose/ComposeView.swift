@@ -190,7 +190,7 @@ struct ComposeView: View {
                     image: baked,
                     count: count,
                     layout: template.layout,
-                    frameID: template.frame?.id,
+                    frameID: template.frame.id,
                     filterID: filter,
                     caption: caption
                 )
