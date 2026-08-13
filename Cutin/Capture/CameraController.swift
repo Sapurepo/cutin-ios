@@ -43,6 +43,10 @@ final class CameraController: NSObject, @unchecked Sendable {
     private(set) var isFront = true
     private(set) var isRunning = false
 
+    /// 권한은 있는데 카메라 입력을 붙이지 못한 상태(다른 앱이 카메라를 쥐고 있는 등).
+    /// 프리뷰만 검게 두면 사용자는 앱이 고장 난 줄 알고, 되살릴 방법도 알 수 없다.
+    private(set) var isUnavailable = false
+
     let session = AVCaptureSession()
 
     @ObservationIgnored private let sessionQueue = DispatchQueue(label: "io.cutin.camera.session")
@@ -126,13 +130,24 @@ final class CameraController: NSObject, @unchecked Sendable {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             if !self.isConfigured {
-                self.configure(front: facingFront)
+                /* 입력이 붙지 않았는데 `isConfigured`를 세우면 이 컨트롤러가 사는 동안 다시
+                 * 구성하지 않는다 — 포그라운드 복귀도, 사용자가 다시 시도해도 되살릴 수 없다. */
+                guard self.configure(front: facingFront) else {
+                    DispatchQueue.main.async {
+                        self.isRunning = false
+                        self.isUnavailable = true
+                    }
+                    return
+                }
                 self.isConfigured = true
             }
             if !self.session.isRunning { self.session.startRunning() }
 
             let running = self.session.isRunning
-            DispatchQueue.main.async { self.isRunning = running }
+            DispatchQueue.main.async {
+                self.isRunning = running
+                self.isUnavailable = false
+            }
         }
     }
 
@@ -188,11 +203,14 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     // MARK: - 세션 구성 (sessionQueue 전용)
 
-    private func configure(front: Bool) {
+    /// 비디오 입력이 실제로 붙었는지 돌려준다. 입력 없는 세션은 프리뷰도 못 그리고,
+    /// 촬영을 시도하면 AVFoundation이 `NSInvalidArgumentException`을 던진다(Swift에서 못 잡는다).
+    @discardableResult
+    private func configure(front: Bool) -> Bool {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
-        addInput(front: front)
+        let hasInput = addInput(front: front)
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
@@ -201,14 +219,17 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         session.commitConfiguration()
         applyConnectionSettings(front: front)
+        return hasInput
     }
 
-    private func addInput(front: Bool) {
+    @discardableResult
+    private func addInput(front: Bool) -> Bool {
         guard let device = Self.device(front: front),
               let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input)
-        else { return }
+        else { return false }
         session.addInput(input)
+        return true
     }
 
     private static func device(front: Bool) -> AVCaptureDevice? {
@@ -243,11 +264,24 @@ final class CameraController: NSObject, @unchecked Sendable {
             // 입력을 갈아치우면 진행 중인 촬영의 델리게이트를 기대할 수 없다.
             self.resolvePending(.failure(CaptureError.cancelled))
 
+            let previous = self.session.inputs
             self.session.beginConfiguration()
-            for input in self.session.inputs { self.session.removeInput(input) }
-            self.addInput(front: next)
+            for input in previous { self.session.removeInput(input) }
+            let switched = self.addInput(front: next)
+            if !switched {
+                /* 반대 카메라를 열지 못했다. 그대로 두면 **입력 없는 세션**이 남아 프리뷰가
+                 * 검게 죽고 다음 촬영이 예외로 떨어진다. 쓰던 입력을 되돌려 놓는다. */
+                for input in previous where self.session.canAddInput(input) {
+                    self.session.addInput(input)
+                }
+            }
             self.session.commitConfiguration()
-            self.applyConnectionSettings(front: next)
+
+            let facing = switched ? next : !next
+            self.applyConnectionSettings(front: facing)
+            if !switched {
+                DispatchQueue.main.async { self.isFront = facing }
+            }
         }
     }
 
@@ -256,7 +290,12 @@ final class CameraController: NSObject, @unchecked Sendable {
     func capturePhoto() async throws -> UIImage {
         try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async { [weak self] in
-                guard let self, self.session.isRunning else {
+                /* 활성 비디오 연결까지 확인한다. `isRunning`만 보면 입력 없이 돌아가는 세션에
+                 * 촬영을 걸게 되고, 그때 AVFoundation은 Swift에서 잡을 수 없는
+                 * `NSInvalidArgumentException`("no active and enabled video connection")을 던진다. */
+                guard let self, self.session.isRunning,
+                      self.photoOutput.connection(with: .video)?.isActive == true
+                else {
                     continuation.resume(throwing: CaptureError.notReady)
                     return
                 }

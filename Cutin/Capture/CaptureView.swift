@@ -77,6 +77,9 @@ struct CaptureView: View {
     private var viewfinder: some View {
         ZStack {
             switch camera.permission {
+            case .granted where camera.isUnavailable:
+                unavailableBox
+
             case .granted:
                 CameraPreview(session: camera.session)
                     .ignoresSafeArea(edges: .horizontal)
@@ -146,6 +149,26 @@ struct CaptureView: View {
         // .cancelled는 사용자가 접은 경우라 이 함수까지 오지 않는다(shoot에서 걸러진다).
         case .noImageData, .timedOut, .cancelled: return "촬영에 실패했어요. 다시 눌러주세요"
         }
+    }
+
+    /* 권한은 있는데 카메라를 열지 못한 상태 — 다른 앱이 카메라를 쥐고 있으면(FaceTime·연속성
+     * 카메라) 입력을 붙일 수 없다. 검은 프리뷰만 두면 사용자는 앱이 고장 난 줄 알고, 실제로
+     * 되살릴 방법도 앱을 껐다 켜는 것뿐이었다. */
+    private var unavailableBox: some View {
+        VStack(spacing: Spacing.x4) {
+            Text("카메라를 열 수 없어요")
+                .font(Typography.buttonLabel)
+                .foregroundStyle(.white)
+            Text("다른 앱이 카메라를 쓰고 있는지 확인해 주세요")
+                .font(Typography.caption)
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+
+            Button("다시 시도") { camera.start() }
+                .primaryGlassButton(tint: .white)
+        }
+        .padding(Spacing.x6)
+        .tint(.white)
     }
 
     private var permissionBox: some View {
