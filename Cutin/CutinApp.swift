@@ -20,6 +20,9 @@ struct CutinApp: App {
     @State private var catalog: TemplateCatalog
     /// 발행 진행 상태. 촬영 커버가 닫혀도 살아야 하므로 앱이 소유한다.
     @State private var publisher: PostPublisher
+    /// 친구 관계와 댓글. 여러 화면이 같은 값을 읽으므로 앱이 소유한다.
+    @State private var social: SocialStore
+    @State private var comments: CommentStore
 
     init() {
         KakaoLogin.initialize()
@@ -30,6 +33,8 @@ struct CutinApp: App {
         catalog = TemplateCatalog(client: client)
         store = PostStore(client: client)
         publisher = PostPublisher(client: client)
+        social = SocialStore(client: client)
+        comments = CommentStore(client: client)
     }
 
     var body: some Scene {
@@ -40,6 +45,8 @@ struct CutinApp: App {
                 .environment(session)
                 .environment(catalog)
                 .environment(publisher)
+                .environment(social)
+                .environment(comments)
                 /* 카카오톡에서 되돌아오는 URL. `RootView`가 아니라 여기에 두는 이유는
                  * 로그인 화면(게이트의 다른 분기)에서도 받아야 하기 때문이다. */
                 .onOpenURL { url in _ = KakaoLogin.handle(url) }

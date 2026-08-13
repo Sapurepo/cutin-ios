@@ -26,12 +26,7 @@ struct FeedView: View {
         )
         .background(palette.bg)
         .navigationTitle("CUTIN")
-        .navigationDestination(for: Route.self) { route in
-            switch route {
-            case .postDetail(let id):
-                PostDetailView(id: id)
-            }
-        }
+        .routeDestinations()
         .task { await store.loadFeed() }
     }
 }

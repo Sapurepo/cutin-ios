@@ -3,8 +3,8 @@
  * 담은 것: §7.1 공유, §7.4 보관, §7.5 삭제, 그리고 사진 앱 저장
  * (`Info.plist`의 `NSPhotoLibraryAddUsageDescription`이 이미 약속한 기능이다).
  *
- * 담지 않은 것: §7.2 댓글 · §7.3 반응. 계약에는 있고 포스트에 수치도 실려 오지만, 화면을
- * 만드는 것은 다음 브랜치다. 수치만 보여주고 누를 수 없게 두면 고장난 것으로 읽힌다.
+ * §7.2 댓글은 목록 화면으로 푸시하고, §7.3 반응은 여기에 줄로 둔다 — 반응은 누르고 끝이지만
+ * 댓글은 쓰는 동안 키보드가 화면을 반으로 나눈다.
  *
  * 포스트를 값으로 받지 않고 id로 되찾는다(규칙 4) — 보관·삭제가 목록도 함께 바꾼다.
  *
@@ -28,6 +28,7 @@ struct PostDetailView: View {
     @State private var notice: String?
     @State private var isSavingToPhotos = false
     @State private var shareURL: URL?
+    @State private var isReporting = false
 
     var body: some View {
         Group {
@@ -60,17 +61,28 @@ struct PostDetailView: View {
                         .foregroundStyle(palette.textPrimary)
                 }
                 if let notice { noticeLabel(notice) }
+                reactions(post)
+                commentsLink(post)
                 actions(post)
             }
             .padding(Spacing.x4)
         }
         .toolbar {
-            // 남의 포스트는 지울 수 없다 — 서버가 404를 내므로 버튼을 두면 거짓 약속이다.
-            if post.author.id == session.userId {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("삭제", role: .destructive) { delete(post) }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    // 남의 포스트는 지울 수 없다 — 서버가 404를 내므로 버튼을 두면 거짓 약속이다.
+                    if post.author.id == session.userId {
+                        Button("삭제", role: .destructive) { delete(post) }
+                    } else {
+                        Button("신고하기") { isReporting = true }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
             }
+        }
+        .sheet(isPresented: $isReporting) {
+            ReportSheet(targetType: .post, targetId: post.id)
         }
     }
 
@@ -78,10 +90,18 @@ struct PostDetailView: View {
 
     private func author(_ post: Post) -> some View {
         HStack(spacing: Spacing.x2) {
-            AvatarView(url: post.author.avatarUrl, nickname: post.author.nickname, size: 28)
-            Text(post.author.nickname ?? "이름 없음")
-                .font(Typography.bodyText)
-                .foregroundStyle(palette.textPrimary)
+            // 내 포스트에서 내 프로필로 가지 않는다 — 탭이 이미 그 화면이다.
+            NavigationLink(value: Route.userProfile(post.author.id)) {
+                HStack(spacing: Spacing.x2) {
+                    AvatarView(url: post.author.avatarUrl,
+                               nickname: post.author.nickname, size: 28)
+                    Text(post.author.nickname ?? "이름 없음")
+                        .font(Typography.bodyText)
+                        .foregroundStyle(palette.textPrimary)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(post.author.id == session.userId)
             Spacer(minLength: 0)
             if let date = post.displayDate {
                 Text(date, format: .dateTime.year().month().day().hour().minute())
@@ -96,6 +116,58 @@ struct PostDetailView: View {
             .font(Typography.caption)
             .foregroundStyle(palette.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* 반응 줄(§7.3). 다섯 종류를 다 펼쳐 둔다 — 길게 눌러 고르는 방식은 처음 쓰는 사람이
+     * 발견하지 못하고, 종류가 다섯뿐이라 한 줄에 들어간다.
+     *
+     * 수치는 서버 요약을 그대로 읽는다. 누른 순간 앱이 +1 하면 여러 사람이 동시에 반응할 때
+     * 금세 어긋나고, 서버가 응답으로 바뀐 요약 전체를 주므로 그럴 이유도 없다. */
+    private func reactions(_ post: Post) -> some View {
+        HStack(spacing: Spacing.x2) {
+            ForEach(ReactionType.allCases, id: \.self) { type in
+                let count = post.reactions.counts.first { $0.type.known == type }?.count ?? 0
+                let mine = post.reactions.mine?.known == type
+                Button {
+                    Task { await store.react(id: post.id, type: type) }
+                } label: {
+                    HStack(spacing: 2) {
+                        Text(type.emoji)
+                        if count > 0 {
+                            Text("\(count)")
+                                .font(Typography.chip)
+                                .foregroundStyle(mine ? palette.accentOn : palette.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, Spacing.x2)
+                    .padding(.vertical, Spacing.x1)
+                    .background(mine ? palette.accent : palette.surface, in: .capsule)
+                    .tokenBorder(Capsule(), color: mine ? .clear : palette.border)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func commentsLink(_ post: Post) -> some View {
+        NavigationLink(value: Route.comments(post.id)) {
+            HStack(spacing: Spacing.x2) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 15, weight: .medium))
+                Text(post.commentCount == 0 ? "댓글 남기기" : "댓글 \(post.commentCount)개")
+                    .font(Typography.bodyText)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(palette.textSecondary)
+            }
+            .foregroundStyle(palette.textPrimary)
+            .padding(Spacing.x3)
+            .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
+            .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
+        }
+        .buttonStyle(.plain)
     }
 
     private func actions(_ post: Post) -> some View {
@@ -193,6 +265,20 @@ struct PostDetailView: View {
             notice = "사진 앱에 저장했어요"
         } catch {
             notice = "사진 앱에 저장하지 못했어요"
+        }
+    }
+}
+
+extension ReactionType {
+    /* 이모지는 **콘텐츠**다 — 디자인 토큰에 넣지 않는다. 서버가 종류를 늘리면 여기 한 줄이
+     * 늘고, 모르는 값은 `ServerEnum`이 원시 문자열로 보존해 화면에서만 빠진다. */
+    var emoji: String {
+        switch self {
+        case .like: return "👍"
+        case .love: return "❤️"
+        case .haha: return "😂"
+        case .wow: return "😮"
+        case .sad: return "😢"
         }
     }
 }
