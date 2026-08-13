@@ -12,6 +12,7 @@ struct CutinApp: App {
     @State private var flow = CaptureFlow()
     /// 보관은 피드·보관 탭·상세가 함께 읽는 상태라 앱이 소유한다.
     @State private var archive = ArchiveStore()
+    @State private var profile = ProfileStore()
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct CutinApp: App {
                 .environment(store)
                 .environment(flow)
                 .environment(archive)
+                .environment(profile)
         }
     }
 }
