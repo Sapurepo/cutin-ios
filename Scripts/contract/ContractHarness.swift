@@ -64,8 +64,10 @@ enum ContractHarness {
             thumbnailCutIndex: .value(2),
             cuts: [.init(cutIndex: 0, mediaId: sampleID), .init(cutIndex: 1, mediaId: sampleID)]
         ))
-        // 캡션·대표 컷을 **지우는** 요청 — null이 실려야 하고 키가 빠지면 안 된다
-        emit("UpdatePostBodyDto", PatchPostBody(caption: .null, thumbnailCutIndex: .null))
+        // 프레임을 지정하는 요청
+        emit("UpdatePostBodyDto", PatchPostBody(frameId: .value(sampleID)))
+        // 캡션·대표 컷·프레임을 **지우는** 요청 — null이 실려야 하고 키가 빠지면 안 된다
+        emit("UpdatePostBodyDto", PatchPostBody(frameId: .null, caption: .null, thumbnailCutIndex: .null))
         // 아무것도 안 건드리는 요청 — 키가 하나도 없어야 한다
         emit("UpdatePostBodyDto", PatchPostBody())
         emit("PublishPostBodyDto", PublishPostBody(composedMediaId: sampleID,

@@ -160,6 +160,43 @@ struct TemplatesResponse: Decodable, Sendable {
     let items: [Template]
 }
 
+// MARK: - 프레임(외형)
+
+/* 합성 결과의 겉모습 — 프레임 색·여백·컷 라운딩·푸터. 서버가 소유한다(`GET /frames`).
+ *
+ * **길이는 캔버스 폭 대비 비율이다.** 0.1.0은 이 값들을 360pt 설계 폭 기준 px으로 갖고
+ * 출력 폭에 비례 확대했는데, 서버가 px으로 주면 어느 폭 기준인지가 계약에서 빠진다.
+ * 서버 시드가 `ratio(px) = px / 360`으로 같은 값을 비율로 바꿔 담았다.
+ *
+ * 색은 `"#RRGGBB"` 문자열이다. **UI 테마 색이 아니라 콘텐츠 색이다** — 합성본은 한 번 구워지면
+ * 파일로 남으므로 사용자가 라이트/다크를 바꿔도 같은 그림이어야 한다. */
+struct Frame: Decodable, Sendable, Hashable {
+    enum Footer: String, Sendable, Hashable {
+        /// 하단 CUTIN 로고 + 날짜 스탬프. 로고 문자열과 서체는 클라이언트 자산이다.
+        case logoDate
+    }
+
+    let id: UUID
+    /// 안정 식별자(`basic`·`white`…). id는 환경마다 다르다.
+    let code: String
+    let name: String
+    /// 프레임 배경 `#RRGGBB`
+    let background: String
+    /// 푸터 스탬프·빈 슬롯 표시 `#RRGGBB`
+    let foreground: String
+    let padding: Double
+    let gutter: Double
+    let cellRadius: Double
+    /// null이면 푸터를 그리지 않는다.
+    let footer: ServerEnum<Footer>?
+}
+
+/* 페이징이 없다 — 목록이 8종이라 서버가 커서를 두지 않았다. 활성 항목만 내려오고
+ * **배열이 이미 노출 순서로 정렬돼 있다**(`isActive`·`sortOrder`가 계약에 없는 이유다). */
+struct FramesResponse: Decodable, Sendable {
+    let items: [Frame]
+}
+
 // MARK: - 미디어
 
 struct CreateUploadBody: Encodable, Sendable {
@@ -229,6 +266,10 @@ struct Post: Decodable, Sendable, Hashable {
     let id: UUID
     let author: PostAuthor
     let template: Template
+    /* **null일 수 있다.** 서버가 null을 기본 프레임으로 풀어 주지 않으므로
+     * (`postsService.ts`가 `frame === null ? null : …`) `frameId`를 넣지 않은 draft는
+     * 여기가 비어 온다. 렌더하는 쪽이 기본값을 정해야 한다. */
+    let frame: Frame?
     let status: ServerEnum<PostStatus>
     let visibility: ServerEnum<PostVisibility>
     let caption: String?
@@ -241,6 +282,8 @@ struct Post: Decodable, Sendable, Hashable {
     let createdAt: String
     let commentCount: Int
     let reactions: ReactionSummary
+    /// 요청자 기준 보관 여부. 0.1.0의 로컬 `archive.json`을 대체한다.
+    let bookmarked: Bool
 }
 
 /// 커서 페이지. 서버 `pageSchema`가 모든 목록에 같은 모양을 씌운다.
@@ -266,6 +309,8 @@ struct PatchPostBody: Encodable, Sendable {
      * 건드리지 않는 것을 구별해야 한다: 전자는 `null`을 실어야 하고 후자는 키를 빼야 한다.
      * `String?`으로는 둘이 같은 표현이 되어 캡션을 지울 수단이 없어진다. */
     var templateId: UUID?
+    /// `.null`을 보내면 프레임을 지운다 — 그 포스트의 `frame`이 null로 내려온다.
+    var frameId: Field<UUID>?
     var caption: Field<String>?
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Field<Int>?
@@ -277,6 +322,12 @@ struct PublishPostBody: Encodable, Sendable {
     var caption: Field<String>?
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Int?
+}
+
+/* 보관 토글 응답. `PUT`은 `true`, `DELETE`는 `false`를 돌려준다 —
+ * 멱등이라 두 번 눌러도 같은 값이다(서버가 유니크 인덱스로 보장한다). */
+struct BookmarkResult: Decodable, Sendable {
+    let bookmarked: Bool
 }
 
 /* 이름에 `Response`가 붙은 이유: `ShareLink`는 SwiftUI의 공유 버튼 타입이다.

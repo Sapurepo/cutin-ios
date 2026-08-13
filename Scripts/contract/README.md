@@ -13,7 +13,10 @@
 
 ## openapi.json
 
-`cutin-backend` `feature/p5-push` `0f8afa4`에서 뽑은 스냅샷입니다.
+`cutin-backend` `feature/client-requests` `ccc04b7`에서 뽑은 스냅샷입니다.
+
+> ⚠️ 이 브랜치는 **아직 병합 전**입니다(백엔드 PR #12). 리뷰에서 바뀌면 스냅샷을 다시 뽑아야
+> 합니다. 병합되면 이 문구를 지우고 커밋 해시를 갱신하세요.
 
 ```bash
 # 갱신할 때 (cutin-backend에서)

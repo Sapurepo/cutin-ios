@@ -66,6 +66,8 @@ PAIRS = [
     ('MediaDto_Output', 'Media'),
     ('PostDto_Output', 'Post'),
     ('PostPageDto_Output', 'PostPage'),
+    ('FramesResponseDto_Output', 'FramesResponse'),
+    ('BookmarkResultDto_Output', 'BookmarkResult'),
     ('ShareLinkDto_Output', 'ShareLinkResponse'),
     ('ErrorResponseDto', 'APIErrorEnvelope'),
 ]
