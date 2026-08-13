@@ -6,11 +6,11 @@
 
 import UIKit
 
-struct CompositionRequest {
+struct CompositionRequest: Sendable {
     var images: [UIImage]
     var count: CutCount
     var layout: CutLayout
-    var skin: FrameSkin?
+    var skin: FrameSkin
     var filter: FilterID = .original
     /// 프레임 푸터 날짜 스탬프 — 스킨에 footer가 있을 때만 표시
     var stampDate: Date?
@@ -21,16 +21,14 @@ struct CompositionRequest {
 enum CutCompositor {
     /// 스킨 값(padding 12 / gutter 8 …)이 설계된 기준 폭. 출력 폭에 맞춰 비례 확대한다.
     private static let designWidth: CGFloat = 360
-    /// 기본 룩(스킨 없음)의 헤어라인 거터 — 원본 `cutFrame.tsx`의 `GUTTER`
-    private static let defaultGutter: CGFloat = 4
-    private static let defaultCellRadius: CGFloat = 3
 
     static func render(_ request: CompositionRequest) -> UIImage {
+        let skin = request.skin
         let scale = request.outputWidth / designWidth
-        let padding = (request.skin?.padding ?? defaultGutter) * scale
-        let gutter = (request.skin?.gutter ?? defaultGutter) * scale
-        let cellRadius = (request.skin?.cellRadius ?? defaultCellRadius) * scale
-        let hasFooter = request.skin?.footer == .logoDate
+        let padding = skin.padding * scale
+        let gutter = skin.gutter * scale
+        let cellRadius = skin.cellRadius * scale
+        let hasFooter = skin.footer == .logoDate
 
         // 컷 그리드는 항상 정사각 (원본 `styles.grid: { aspectRatio: 1 }`)
         let gridSide = request.outputWidth - padding * 2
@@ -40,8 +38,6 @@ enum CutCompositor {
         let gridRect = CGRect(x: padding, y: padding, width: gridSide, height: gridSide)
         let cells = CutLayoutEngine.cells(count: request.count, layout: request.layout, in: gridRect, gutter: gutter)
 
-        let filtered = request.images.map { ImageFilterer.apply(request.filter, to: $0) }
-
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
         format.opaque = true
@@ -49,24 +45,33 @@ enum CutCompositor {
         return UIGraphicsImageRenderer(size: canvas, format: format).image { ctx in
             let cg = ctx.cgContext
 
-            // 프레임 배경 — 스킨이 없으면 기본 룩(잉크 계열 sunken)
-            let background = request.skin?.bg ?? Palette.dark.surfaceSunken
-            cg.setFillColor(UIColor(background).cgColor)
+            cg.setFillColor(UIColor(skin.bg).cgColor)
             cg.fill(CGRect(origin: .zero, size: canvas))
 
+            // 빈 슬롯 표시 — 프레임 색에서 파생시킨다. 이전 구현은 잉크 팔레트를 역참조해
+            // 흰 프레임 위에 검은 구멍이 뚫렸다.
+            let slotFill = UIColor(skin.fg).withAlphaComponent(0.1).cgColor
+
             for (index, cell) in cells.enumerated() {
-                // 빈 슬롯은 살짝 어두운 플레이스홀더로 남긴다 (컷을 덜 찍고 저장한 경우)
                 cg.saveGState()
                 UIBezierPath(roundedRect: cell, cornerRadius: cellRadius).addClip()
-                cg.setFillColor(UIColor(Palette.dark.surface).cgColor)
+                cg.setFillColor(slotFill)
                 cg.fill(cell)
-                if index < filtered.count {
-                    draw(filtered[index], aspectFillIn: cell)
+                if index < request.images.count {
+                    let source = request.images[index]
+                    /* 필터는 원본 전체가 아니라 **이 셀에 실제로 그려질 크기**로 줄인 뒤 적용한다.
+                     * 12MP 컷의 셀 안 크기는 프리뷰에서 30만 화소가 안 되므로 계산량이 그만큼 준다. */
+                    let cut = ImageFilterer.apply(
+                        request.filter,
+                        to: source,
+                        downsampledTo: drawnSize(of: source.size, in: cell)
+                    )
+                    draw(cut, aspectFillIn: cell)
                 }
                 cg.restoreGState()
             }
 
-            if hasFooter, let skin = request.skin {
+            if hasFooter {
                 drawFooter(
                     skin: skin,
                     date: request.stampDate,
@@ -84,12 +89,20 @@ enum CutCompositor {
         (10 + 14 + 2 + 12) * scale
     }
 
+    /// `contentFit: "cover"`로 셀을 채울 때 실제로 그려지는 크기.
+    /// 필터 다운샘플 목표와 그리기가 **같은 식**을 써야 축소가 한 번만 일어난다.
+    private static func drawnSize(of imageSize: CGSize, in rect: CGRect) -> CGSize {
+        guard imageSize.width > 0, imageSize.height > 0 else { return rect.size }
+
+        let scale = max(rect.width / imageSize.width, rect.height / imageSize.height)
+        return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+    }
+
     /// `contentFit: "cover"` 대응 — 비율 유지하며 셀을 꽉 채우고 넘치는 부분은 잘라낸다.
     private static func draw(_ image: UIImage, aspectFillIn rect: CGRect) {
         guard image.size.width > 0, image.size.height > 0 else { return }
 
-        let scale = max(rect.width / image.size.width, rect.height / image.size.height)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let size = drawnSize(of: image.size, in: rect)
         let origin = CGPoint(
             x: rect.midX - size.width / 2,
             y: rect.midY - size.height / 2

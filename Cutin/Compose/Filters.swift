@@ -81,7 +81,23 @@ enum FilterID: String, CaseIterable, Codable, Identifiable, Sendable {
 enum ImageFilterer {
     /// workingColorSpace를 비워 sRGB 값에 직접 매트릭스를 적용한다.
     /// (기본 CIContext는 선형 공간에서 계산해 RN판과 결과가 달라진다)
+    /// CIContext는 SDK에서 이미 Sendable이라 이 전역 상수는 Swift 6에서 그대로 통과한다.
     private static let context = CIContext(options: [.workingColorSpace: NSNull()])
+
+    /// 셀에 그려질 크기로 먼저 줄인 뒤 필터를 적용한다.
+    ///
+    /// 12MP 원본에 매트릭스를 걸면 화면에 남지도 않는 화소까지 계산한다 — 540px 프리뷰의
+    /// 4컷 셀 하나는 30만 화소가 안 된다. 컬러 매트릭스는 화소별 선형 변환(`f(x) = Mx + b`)이라
+    /// 가중평균인 축소와 순서를 바꿔도 결과가 같다(`avg(Mx+b) == M·avg(x)+b`).
+    ///
+    /// 어긋나는 곳은 0·1로 **포화되어 클램프되는 화소**뿐이다. 축소를 먼저 하면 클램프에
+    /// 잘려 나가던 여분이 평균에 남기 때문이다. 순백이 순흑에 맞닿은 합성 입력으로 재보니
+    /// 채널 최대 차 17/255, 평균 차 0.7/255였고, 필터가 `.original`이면 차이가 0이다
+    /// (매트릭스가 없어 축소 자체를 건너뛴다).
+    static func apply(_ filterID: FilterID, to image: UIImage, downsampledTo size: CGSize) -> UIImage {
+        guard filterID.matrix != nil else { return image }
+        return apply(filterID, to: downsampled(image, to: size))
+    }
 
     /// 필터를 실제 픽셀에 적용한다. 실패하면 원본을 그대로 돌려준다.
     static func apply(_ filterID: FilterID, to image: UIImage) -> UIImage {
@@ -100,5 +116,21 @@ enum ImageFilterer {
         else { return image }
 
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// 원본이 이미 목표보다 작으면 그대로 둔다 — 늘려 담아도 없던 화소가 생기지 않는다.
+    /// 축소는 합성기가 쓰는 것과 같은 Core Graphics 리샘플이라, 바뀌는 것은 "언제 줄이는가"뿐이다.
+    private static func downsampled(_ image: UIImage, to size: CGSize) -> UIImage {
+        guard size.width >= 1, size.height >= 1,
+              size.width < image.size.width, size.height < image.size.height
+        else { return image }
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 }
