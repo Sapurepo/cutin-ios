@@ -123,7 +123,7 @@ struct ProfileView: View {
     private var totalCuts: Int {
         store.posts
             .filter { $0.recoveredFromFile != true }
-            .reduce(0) { $0 + $1.count.rawValue }
+            .reduce(0) { $0 + ($1.template?.cutCount ?? 0) }
     }
 
     /// 보관 수는 id 집합 크기가 아니라 **실재하는 포스트와의 교집합**을 센다 —

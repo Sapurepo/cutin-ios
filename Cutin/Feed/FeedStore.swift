@@ -78,9 +78,8 @@ final class FeedStore {
     /// 합성 결과를 저장하고 피드 맨 앞에 붙인다.
     func save(
         image: UIImage,
-        count: CutCount,
-        layout: CutLayout,
-        frameID: String?,
+        template: Template?,
+        frame: Frame?,
         filterID: FilterID,
         caption: String
     ) throws {
@@ -94,9 +93,8 @@ final class FeedStore {
             id: id,
             createdAt: Date(),
             imageFilename: name,
-            count: count,
-            layout: layout,
-            frameID: frameID,
+            template: template,
+            frame: frame,
             filterID: filterID,
             caption: caption
         )
@@ -142,6 +140,16 @@ final class FeedStore {
             // 봉투 없는 옛 형식이었으면 현재 스키마로 다시 써 둔다.
             if migrated { try? index.save(posts) }
 
+        /* 구버전 스키마라 의도적으로 버렸다(0.2.0 결정: 로컬 포스트 폐기).
+         *
+         * **JPEG에서 되살리지 않는다.** 되살리면 메타 없는 자리값 레코드가 목록을 채우고,
+         * 사용자는 "버렸다"는 결정 대신 "깨졌다"를 보게 된다. 인덱스만 새로 쓰고 빈 목록으로
+         * 시작한다 — 파일은 남아 있으므로 나중에 필요하면 손으로 꺼낼 수 있다. */
+        case .discarded(let from):
+            print("[FeedStore] 인덱스 스키마 v\(from) → v\(LocalPostIndex.currentSchema): 옛 레코드를 버립니다")
+            posts = []
+            try? index.save(posts)
+
         /* 손상된 원본은 이미 격리됐다 — 되살린 게 0장이어도 상태를 알린다.
          * 조용히 빈 피드를 보여주면 사용자는 목록이 사라진 이유를 알 방법이 없다. */
         case .quarantined(let url):
@@ -169,8 +177,8 @@ final class FeedStore {
     /* 인덱스를 잃었을 때 JPEG에서 목록을 되살린다. 사진은 사용자가 유일하게 잃으면 안 되는
      * 것이라 "빈 목록으로 시작"보다 이게 맞다.
      *
-     * 캡션·보정·레이아웃·컷 수는 인덱스에만 있던 메타데이터라 복구되지 않는다. 아래 값들은
-     * 자리값이고, 진짜 값으로 오해되지 않도록 `recoveredFromFile`로 표시해 파일에 남긴다. */
+     * 캡션·보정·템플릿·프레임은 인덱스에만 있던 메타데이터라 복구되지 않는다. 없는 것은
+     * nil로 두고, 진짜 값으로 오해되지 않도록 `recoveredFromFile`로 표시해 파일에 남긴다. */
     private func rebuildFromFiles() -> [ComposedPost] {
         guard let names = try? files.storedNames() else { return [] }
         let suffix = ".\(PostFileStore.fileExtension)"
@@ -184,9 +192,10 @@ final class FeedStore {
                     id: id,
                     createdAt: files.creationDate(name) ?? Date(),
                     imageFilename: name,
-                    count: .four,
-                    layout: .grid2x2,
-                    frameID: nil,
+                    /* 0.1.0은 여기에 `.four`·`.grid2x2` 자리값을 넣었다. 이제는 nil이다 —
+                     * 모르는 값을 아는 척하면 프로필 통계가 거짓이 된다. */
+                    template: nil,
+                    frame: nil,
                     filterID: .original,
                     caption: "",
                     recoveredFromFile: true

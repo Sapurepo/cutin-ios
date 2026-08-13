@@ -42,14 +42,21 @@ struct ComposePreview: View {
         .task(id: renderKey) { await render() }
     }
 
-    /// 다시 구워야 하는 입력이 바뀌었는지. `cutsRevision`이 없으면 카메라로 돌아가
-    /// 한 컷을 재촬영하고 와도 컷 수가 같아 옛 그림이 남는다.
+    /* 다시 구워야 하는 입력이 바뀌었는지. `cutsRevision`이 없으면 카메라로 돌아가
+     * 한 컷을 재촬영하고 와도 컷 수가 같아 옛 그림이 남는다.
+     *
+     * 배치와 외형이 따로 오므로(`/templates`·`/frames`) 둘을 모두 센다 — 프레임만 바꿔도
+     * 색과 여백이 달라진다. */
     private var renderKey: String {
-        "\(flow.templateID)-\(flow.filterID.rawValue)-\(flow.cutsRevision)"
+        let template = flow.template?.id.uuidString ?? "-"
+        let frame = flow.frame?.id.uuidString ?? "-"
+        return "\(template)-\(frame)-\(flow.filterID.rawValue)-\(flow.cutsRevision)"
     }
 
     private func render() async {
         guard !flow.cuts.isEmpty else { return }
+        // 템플릿·프레임이 없으면 그릴 배치가 없다. 자리만 잡아 둔 사각형이 그대로 남는다.
+        guard let request = flow.compositionRequest(outputWidth: Self.width) else { return }
 
         /* 칩을 빠르게 훑으면 선택마다 렌더가 시작된다. `Task.detached`는 취소를 물려받지 않으니
          * 한 번 시작한 합성은 끝까지 간다 — 컷마다 12MP를 축소하는 일이 겹쳐 쌓인다.
@@ -59,7 +66,6 @@ struct ComposePreview: View {
 
         isRendering = true
 
-        let request = flow.compositionRequest(outputWidth: Self.width)
         let rendered = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
         }.value

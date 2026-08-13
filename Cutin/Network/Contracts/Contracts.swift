@@ -135,7 +135,7 @@ struct NicknameAvailability: Decodable, Sendable {
 // MARK: - 템플릿
 
 /// 컷 하나가 놓일 자리. 그리드 영역 기준 0~1 비율이다.
-struct TemplateSlot: Decodable, Sendable, Hashable {
+struct TemplateSlot: Codable, Sendable, Hashable {
     let x: Double
     let y: Double
     let width: Double
@@ -145,7 +145,7 @@ struct TemplateSlot: Decodable, Sendable, Hashable {
 /* 컷 수와 배치의 **유일한 출처**. 0.1.0의 로컬 `CutCount`·`CutLayout`을 대체한다.
  * 서버 `postsController.ts`: "컷 수와 레이아웃은 서버가 정의한다. 클라이언트가 컷 수를
  * 가정하지 않는다." */
-struct Template: Decodable, Sendable, Hashable {
+struct Template: Codable, Sendable, Hashable {
     let id: UUID
     /// 안정 식별자(`single`·`grid4`…). id는 환경마다 다르므로 코드에서 특정할 때 이걸 쓴다.
     let code: String
@@ -170,7 +170,7 @@ struct TemplatesResponse: Decodable, Sendable {
  *
  * 색은 `"#RRGGBB"` 문자열이다. **UI 테마 색이 아니라 콘텐츠 색이다** — 합성본은 한 번 구워지면
  * 파일로 남으므로 사용자가 라이트/다크를 바꿔도 같은 그림이어야 한다. */
-struct Frame: Decodable, Sendable, Hashable {
+struct Frame: Codable, Sendable, Hashable {
     enum Footer: String, Sendable, Hashable {
         /// 하단 CUTIN 로고 + 날짜 스탬프. 로고 문자열과 서체는 클라이언트 자산이다.
         case logoDate
