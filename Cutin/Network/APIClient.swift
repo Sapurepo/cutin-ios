@@ -1,0 +1,164 @@
+/* HTTP 전송. 계약 타입(`Contracts.swift`)을 실어 보내고 받아온다.
+ *
+ * **엔드포인트별 메서드를 만들지 않는다.** `send`가 둘(응답 있음/없음)뿐이고 경로는 호출부가
+ * 문자열로 넘긴다. 40여 엔드포인트마다 래퍼를 만들면 그 래퍼가 계약 문서의 사본이 되어
+ * 스펙이 바뀔 때 두 곳을 고쳐야 한다. 경로를 아는 것은 그 기능을 만드는 계층의 일이다.
+ *
+ * `actor`인 이유는 액세스 토큰이 가변 상태이기 때문이다. 요청은 여러 화면에서 동시에 나가고
+ * 토큰은 재발급으로 바뀐다 — `@MainActor`로 두면 네트워크 대기가 메인 액터를 잡는다.
+ *
+ * **토큰 재발급은 여기 없다.** 401을 `APIError.isUnauthorized`로 드러내기만 한다. 재발급은
+ * 리프레시 토큰 보관(Keychain)과 동시 401의 직렬화가 필요해 인증 브랜치의 몫이다 —
+ * 보관소 없이 재발급을 쓰면 재발급된 토큰을 저장할 곳이 없다. */
+
+import Foundation
+
+actor APIClient {
+    enum Method: String {
+        case get = "GET"
+        case post = "POST"
+        case patch = "PATCH"
+        case put = "PUT"
+        case delete = "DELETE"
+    }
+
+    private let baseURL: URL
+    private let session: URLSession
+    private var accessToken: String?
+
+    init(baseURL: URL = APIConfig.baseURL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func setAccessToken(_ token: String?) {
+        accessToken = token
+    }
+
+    // MARK: - 보내기
+
+    /// 응답 본문을 디코드해 돌려준다.
+    func send<Response: Decodable & Sendable>(
+        _ method: Method,
+        _ path: String,
+        query: [String: String] = [:],
+        body: (any Encodable & Sendable)? = nil,
+        authorized: Bool = true,
+        as type: Response.Type = Response.self
+    ) async throws -> Response {
+        let data = try await perform(method, path, query: query, body: body, authorized: authorized)
+        do {
+            return try Self.decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding(error)
+        }
+    }
+
+    /// 본문을 쓰지 않는 요청(로그아웃·삭제 등). 2xx면 성공이다.
+    func send(
+        _ method: Method,
+        _ path: String,
+        query: [String: String] = [:],
+        body: (any Encodable & Sendable)? = nil,
+        authorized: Bool = true
+    ) async throws {
+        _ = try await perform(method, path, query: query, body: body, authorized: authorized)
+    }
+
+    // MARK: - 내부
+
+    private func perform(
+        _ method: Method,
+        _ path: String,
+        query: [String: String],
+        body: (any Encodable & Sendable)?,
+        authorized: Bool
+    ) async throws -> Data {
+        var request = URLRequest(url: try url(for: path, query: query))
+        request.httpMethod = method.rawValue
+
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            do {
+                request.httpBody = try Self.encoder.encode(body)
+            } catch {
+                // 계약 타입이 인코딩에 실패하는 것은 코드 결함이다 — 서버 탓이 아니다.
+                throw APIError.decoding(error)
+            }
+        }
+
+        /* 인증이 필요한데 토큰이 없으면 **요청을 보내지 않는다.** 보내면 서버가 401을 주고
+         * 재발급 경로를 타는데, 애초에 토큰이 없으므로 재발급도 실패한다. 상태를 정직하게
+         * 401로 만들어 로그인 화면으로 보내는 것이 짧다. */
+        if authorized {
+            guard let accessToken else {
+                throw APIError.server(
+                    status: 401, code: APIError.Code.unauthorized.rawValue,
+                    message: "로그인이 필요합니다.", details: nil
+                )
+            }
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.transport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.malformedResponse(status: -1, snippet: Self.snippet(data))
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw Self.failure(status: http.statusCode, data: data)
+        }
+        return data
+    }
+
+    private func url(for path: String, query: [String: String]) throws -> URL {
+        /* `appendingPathComponent`가 아니라 상대 URL 해석을 쓴다 — 기준 주소에 경로가
+         * 붙어 있는 경우(리버스 프록시 뒤의 `/api`)에도 맞물린다. */
+        guard let base = URL(string: path.hasPrefix("/") ? String(path.dropFirst()) : path,
+                             relativeTo: baseURL),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: true)
+        else {
+            throw APIError.malformedResponse(status: -1, snippet: "잘못된 경로: \(path)")
+        }
+        if !query.isEmpty {
+            // 키 순서를 고정한다 — 로그와 캐시 키가 호출마다 달라지지 않게.
+            components.queryItems = query.sorted { $0.key < $1.key }
+                .map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        guard let url = components.url else {
+            throw APIError.malformedResponse(status: -1, snippet: "잘못된 쿼리: \(query)")
+        }
+        return url
+    }
+
+    /// 2xx가 아닌 응답을 오류로 바꾼다. 오류 봉투가 아니면 `malformedResponse`다.
+    private static func failure(status: Int, data: Data) -> APIError {
+        guard let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data) else {
+            return .malformedResponse(status: status, snippet: snippet(data))
+        }
+        return .server(
+            status: status,
+            code: envelope.error.code,
+            message: envelope.error.message,
+            // `details`는 모양이 정해지지 않은 값(`z.unknown()`)이라 원본 바이트로 보관한다.
+            details: data
+        )
+    }
+
+    /// 로그에 실을 만큼만 자른다 — HTML 오류 페이지가 통째로 올라오는 것을 막는다.
+    private static func snippet(_ data: Data) -> String {
+        let text = String(decoding: data.prefix(300), as: UTF8.self)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /* 키 변환을 걸지 않는다. 서버가 이미 camelCase로 내려보내고(`nestjs-zod`가 Zod 키를
+     * 그대로 쓴다) 변환을 걸면 `avatarUrl` → `avatar_url`처럼 없는 키를 찾게 된다. */
+    private static let decoder = JSONDecoder()
+    private static let encoder = JSONEncoder()
+}
