@@ -91,9 +91,14 @@ enum ImageFilterer {
     /// 가중평균인 축소와 순서를 바꿔도 결과가 같다(`avg(Mx+b) == M·avg(x)+b`).
     ///
     /// 어긋나는 곳은 0·1로 **포화되어 클램프되는 화소**뿐이다. 축소를 먼저 하면 클램프에
-    /// 잘려 나가던 여분이 평균에 남기 때문이다. 순백이 순흑에 맞닿은 합성 입력으로 재보니
-    /// 채널 최대 차 17/255, 평균 차 0.7/255였고, 필터가 `.original`이면 차이가 0이다
-    /// (매트릭스가 없어 축소 자체를 건너뛴다).
+    /// 잘려 나가던 여분이 평균에 남기 때문이다. 그래서 차이는 행 합이 1을 넘는 필터에서만
+    /// 유의미하다 — `sepia`는 R행 합이 1.35로 가장 크고, `mono`는 Rec.709 luma라 정확히 1.0이다.
+    ///
+    /// 1080px 저장 출력 기준 실측(4032x3024 입력 4장, 채널 최대 / 평균):
+    /// `original` 0 / 0 (매트릭스가 없어 축소 자체를 건너뛰므로 바이트 동일),
+    /// `mono`·`warm`·`cool`·`soft`·`film` ≤ 5 / ≤ 0.34, `sepia` 23 / 0.39.
+    /// 최대치는 2px 주기 밝은 격자를 넣은 적대적 입력에서 나온 값이고, 매끄러운 밝은 입력에서는
+    /// `sepia`도 7 / 0.01이다.
     static func apply(_ filterID: FilterID, to image: UIImage, downsampledTo size: CGSize) -> UIImage {
         guard filterID.matrix != nil else { return image }
         return apply(filterID, to: downsampled(image, to: size))
@@ -128,6 +133,11 @@ enum ImageFilterer {
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
         format.opaque = true
+        /* `.automatic`은 기기에 따라 확장 범위(넓은 색역)로 해석된다. 이 중간 비트맵이 곧
+         * 매트릭스의 입력이므로, 범위를 고정하지 않으면 위의 "sRGB 값에 직접 적용한다"는
+         * 결정이 기기별로 달라진다. mono의 Rec.709 계수와 film의 -0.075 오프셋은
+         * 표준 범위 sRGB를 전제로 이식된 값이다. */
+        format.preferredRange = .standard
 
         return UIGraphicsImageRenderer(size: size, format: format).image { _ in
             image.draw(in: CGRect(origin: .zero, size: size))
