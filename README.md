@@ -64,15 +64,22 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 
 #### 0.1.0의 로컬 결정과 충돌하는 지점
 
+읽어 보면 **서버 `template`은 로컬 `CaptureTemplate`이 아니라 로컬 `CutCount`에 대응합니다.**
+서버 템플릿은 컷 수와 격자만 담고(`seedTemplates.ts`의 4종), 로컬이 커스텀한 레이아웃 변형과
+프레임 외형에는 대응 필드가 없습니다. 두 축을 서버로 옮기는 요청을 넣었습니다.
+
 | 0.1.0 | 서버 계약 | 0.2.0 결정 |
 |---|---|---|
 | `CutCount`(1/2/4/6)·`CutLayout` 로컬 열거형 | 템플릿의 `cutCount`·`slots`가 진실. "클라이언트가 컷 수를 가정하지 않는다" | **서버 템플릿을 진실로 채택** — 로컬 열거형 제거 |
-| `FrameSkin` 레지스트리(프레임 색·거트·푸터) | 서버에 없음 | 보관 위치 미정 — 서버 템플릿 채택 브랜치에서 결정 |
+| `FrameSkin` 스킨 8종(프레임 색·패딩·거터·푸터) | 서버에 없음 | **서버가 소유** — `GET /frames` 신설 요청 ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) B) |
+| 레이아웃 4종(2×2·세로4·가로4·빅레프트) | `grid4` 2×2 하나뿐 | **서버에 3종 추가 요청** ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) A) |
+| 2컷 **가로 배치** | `strip2` **세로 스택** | 서버를 따른다. 의도 확인 요청 ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) A-4) |
+| 캔버스 항상 정사각 | 컷 수마다 다른 `aspectRatio` | 서버를 따른다. 다만 프레임 여백 포함 여부 정의 요청 ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) C) |
 | §6.3 대표 컷 미구현 | `thumbnailCutIndex` 필드 존재 | 구현한다 |
 | 공개 범위 UI 없음 | `visibility` 필수 열거형 | 구현한다 |
 | draft를 로컬 파일로 | 서버 draft(`GET /posts/draft`) | 서버가 진실. 로컬 draft는 오프라인 버퍼로 격하 |
 | `posts.json` 로컬 인덱스 | `GET /feed` 커서 | 서버가 진실 |
-| 인증 없음(바로 피드) | 모든 엔드포인트 Bearer | **로그인 + 온보딩(닉네임)까지 넣는다** |
+| 인증 없음(바로 피드) | 모든 엔드포인트 Bearer | **로그인 + 온보딩(닉네임)까지 넣는다.** Google·Kakao SDK를 SPM으로 도입 |
 | 기존 로컬 포스트 | — | **버린다.** 0.1.0은 실기기 검증도 안 된 개발 빌드였다 |
 | `archive.json` 보관 | **서버 API 없음** | 로컬 유지. [cutin-backend#10](https://github.com/Sapurepo/cutin-backend/issues/10)으로 API 요청 |
 
@@ -95,7 +102,10 @@ Android는 무기한 연기합니다 (명세 §0.1). 1인 개발 체제에서 �
 
 - Xcode 26 이상 (iOS 26 SDK — `glassEffect` 등 Liquid Glass API 사용)
 - 배포 타깃 iOS 26.0
-- 외부 의존성 없음 (SPM 패키지 미사용 — 순정 AVFoundation · Core Image · SwiftUI)
+- 0.1.0까지 외부 의존성 없음 (SPM 패키지 미사용 — 순정 AVFoundation · Core Image · SwiftUI).
+  0.2.0에서 Google·Kakao 로그인 SDK를 SPM으로 도입하며 이 성질이 깨집니다 — `pbxproj`를
+  건드리므로 0.1.0의 규칙 1(pbxproj를 만지는 브랜치는 하나뿐)에 맞춰 **인증 브랜치 한 곳에
+  몰아** 브랜치 충돌을 막습니다
 
 ## Build & Run
 
