@@ -32,7 +32,6 @@ enum Typography {
 
     // MARK: - typeScale (원본 값 그대로)
 
-    static let logo = font(.latin, .bold, size: 18)
     static let headline = font(.body, .semibold, size: 17)
     static let bodyText = font(.body, .regular, size: 14)
     static let caption = font(.body, .regular, size: 11)
@@ -41,7 +40,4 @@ enum Typography {
     /// 버튼·강조 라벨 — 원본 스케일에 없어 `font(.body, .semibold, size: 15)` 인라인 호출이
     /// 3곳(촬영 시작·촬영 방식·권한 안내)에 반복되던 것을 승격
     static let buttonLabel = font(.body, .semibold, size: 15)
-
-    /// 로고 트래킹 — 원본 `typeScale.logo.tracking = 0.02em`
-    static let logoTracking: CGFloat = 18 * 0.02
 }
