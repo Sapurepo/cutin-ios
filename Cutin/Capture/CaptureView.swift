@@ -32,8 +32,12 @@ struct CaptureView: View {
             countdownTask?.cancel()
             camera.stop()
         }
-        .onChange(of: flow.isComplete) { _, complete in
-            if complete { onComplete() }
+        /* "컷이 채워졌을 때"만 넘긴다. `isComplete`만 보면 재촬영 **취소**에도 넘어간다 —
+         * 컷이 다 찬 상태에서 썸네일을 눌러 재촬영을 걸면 isComplete가 false가 되고,
+         * 같은 썸네일을 다시 눌러 취소하면(toggleRetake가 지원하는 동작) 사진 한 장 찍지 않고
+         * true로 되돌아가 편집으로 밀려간다. */
+        .onChange(of: flow.cutsRevision) { _, _ in
+            if flow.isComplete { onComplete() }
         }
     }
 

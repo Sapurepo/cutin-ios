@@ -85,10 +85,7 @@ struct CaptureSetupView: View {
             flow.configure(count: count, mode: mode)
             onStart()
         } label: {
-            Text("촬영 시작")
-                .font(Typography.buttonLabel)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.x4)
+            Text("촬영 시작").primaryGlassLabel()
         }
         .primaryGlassButton(tint: palette.accent)
     }
