@@ -24,16 +24,41 @@ final class AppCoordinator {
     var capturePath: [CaptureStep] = []
 
     /// 액션 탭(중앙 CTA)은 선택값으로 삼지 않는다 — 탭은 그대로 두고 시트만 연다.
-    func select(_ tab: AppTab) {
+    ///
+    /// `hasDraft`를 인자로 받는 이유: draft가 있는지는 촬영 플로우가 알고, 코디네이터는
+    /// 그 결정을 화면으로 옮기는 일만 한다. 코디네이터가 플로우를 직접 들면 셸이 촬영 상태를
+    /// 소유하게 되고, 그건 앱 수명 상태를 셸에서 뺐던 이유와 반대 방향이다.
+    func select(_ tab: AppTab, hasDraft: Bool) {
         guard !tab.isAction else {
-            startCapture()
+            requestCapture(hasDraft: hasDraft)
             return
         }
         self.tab = tab
     }
 
+    /// 미완료 촬영이 있으면 새 촬영을 열지 않고 차단 시트를 띄운다 (§5.3).
+    func requestCapture(hasDraft: Bool) {
+        if hasDraft {
+            isDraftBlockPresented = true
+        } else {
+            startCapture()
+        }
+    }
+
+    var isDraftBlockPresented = false
+
     func startCapture() {
+        isDraftBlockPresented = false
         capturePath = []
+        isCapturePresented = true
+    }
+
+    /// draft를 이어서 쓴다. 컷이 덜 찼으면 카메라로, 다 찼으면 편집 첫 단계로 보낸다.
+    /// 카메라를 스택에 남기는 이유: 뒤로 가면 재촬영이 있는 화면이어야 한다. 촬영 설정으로
+    /// 돌아가 버리면 거기서 `촬영 시작`을 누르는 순간 이어 쓰던 draft가 사라진다.
+    func resumeCapture(isComplete: Bool) {
+        isDraftBlockPresented = false
+        capturePath = isComplete ? [.camera, .template] : [.camera]
         isCapturePresented = true
     }
 

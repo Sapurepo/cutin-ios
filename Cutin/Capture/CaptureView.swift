@@ -237,6 +237,14 @@ struct CaptureView: View {
     /// 보이고, 누를 때마다 실패 문구가 뜬다.
     private var canShoot: Bool {
         camera.permission == .granted && camera.isRunning && countdown == nil && !isShooting
+            && hasSlot
+    }
+
+    /// 채울 자리가 없으면 셔터를 막는다. `addCut`은 컷이 다 찬 상태에서 조용히 버리므로,
+    /// 이 검사가 없으면 사진을 찍고 아무 일도 일어나지 않는다 — draft를 이어 쓰면 컷이
+    /// 다 찬 채로 카메라 화면에 서 있는 상태가 정상 경로가 된다(§5.3).
+    private var hasSlot: Bool {
+        flow.retakeIndex != nil || flow.cuts.count < flow.count.rawValue
     }
 
     private var shutterRow: some View {

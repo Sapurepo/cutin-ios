@@ -14,9 +14,11 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(CaptureFlow.self) private var flow
 
     @State private var coordinator = AppCoordinator()
+    @State private var draftThumbnail: UIImage?
 
     var body: some View {
         TabView(selection: tabSelection) {
@@ -43,16 +45,52 @@ struct RootView: View {
         .fullScreenCover(isPresented: $coordinator.isCapturePresented) {
             captureFlow
         }
+        .sheet(isPresented: $coordinator.isDraftBlockPresented) {
+            draftBlock
+        }
         .environment(\.palette, Palette.of(colorScheme))
         .tint(Palette.of(colorScheme).accent)
+        /* 포그라운드를 떠나기 직전에 draft 메타를 내린다 — 마지막 컷 이후에 고른 템플릿·보정·캡션이
+         * 여기서 파일로 남는다. 강제 종료도 백그라운드를 지나므로 이 지점이 마지막 기회다. */
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { flow.persistDraftMeta() }
+        }
     }
 
     /// 액션 탭을 선택값으로 삼지 않는 커스텀 바인딩.
     private var tabSelection: Binding<AppTab> {
         Binding(
             get: { coordinator.tab },
-            set: { coordinator.select($0) }
+            set: { coordinator.select($0, hasDraft: flow.hasDraft) }
         )
+    }
+
+    // MARK: - 미완료 촬영 차단 (§5.3)
+
+    @ViewBuilder
+    private var draftBlock: some View {
+        if let draft = flow.draft {
+            DraftBlockSheet(
+                draft: draft,
+                thumbnail: draftThumbnail,
+                onResume: resumeDraft,
+                onDiscard: {
+                    flow.discardDraft()
+                    coordinator.startCapture()
+                }
+            )
+            .environment(\.palette, Palette.of(colorScheme))
+            .task { draftThumbnail = await flow.draftThumbnail(maxPixel: 160) }
+        }
+    }
+
+    private func resumeDraft() {
+        Task {
+            let complete = await flow.resumeDraft() && flow.isComplete
+            /* 되살리지 못했으면(파일이 사라졌다) 이 시점에 draft가 정리돼 있다 —
+             * 그대로 새 촬영을 연다. 사용자를 빈 시트에 남기지 않는다. */
+            coordinator.resumeCapture(isComplete: complete)
+        }
     }
 
     /* 정상 경로에서는 보이지 않는다 — selection이 `.capture`가 되기 전에 가로채이기 때문.
@@ -64,7 +102,7 @@ struct RootView: View {
             message: "아래 버튼으로 촬영을 시작하세요",
             systemImage: AppTab.capture.systemImage
         ) {
-            Button("촬영 시작") { coordinator.startCapture() }
+            Button("촬영 시작") { coordinator.requestCapture(hasDraft: flow.hasDraft) }
                 .primaryGlassButton(tint: Palette.of(colorScheme).accent)
         }
         .background(Palette.of(colorScheme).bg)
@@ -82,11 +120,11 @@ struct RootView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    /* flow는 앱 수명이라 여기서 비우지 않으면 찍은 컷(원본 해상도 UIImage)이
-                     * 프로세스가 죽을 때까지 남고, 어느 화면에서도 닿을 수 없다.
-                     * 이탈한 컷을 draft로 보존하는 정책(§5.3)은 draft 브랜치에서 이 자리를 대체한다. */
+                    /* 메모리만 비운다. flow는 앱 수명이라 비우지 않으면 찍은 컷(원본 해상도
+                     * UIImage)이 프로세스가 죽을 때까지 남는다. 파일로 내려간 draft는 그대로
+                     * 두는 것이 §5.3이다 — 다음 진입에서 차단 시트로 이어 쓴다. */
                     Button("닫기") {
-                        flow.reset()
+                        flow.clearMemory()
                         coordinator.isCapturePresented = false
                     }
                 }
@@ -114,7 +152,8 @@ struct RootView: View {
             }
         case .finish:
             FinishStepView(flow: flow) {
-                flow.reset()
+                // draft 해제는 commit이 이미 했다 — 여기서는 메모리만 비운다.
+                flow.clearMemory()
                 coordinator.finishCapture()
             }
         }
