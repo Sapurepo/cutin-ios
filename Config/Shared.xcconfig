@@ -1,0 +1,26 @@
+// 타깃 Debug/Release가 통째로 반복하던 설정 — 두 구성이 같은 값을 가져야 하는 것들.
+// pbxproj에는 구성별로 다른 값만 남긴다.
+
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+CODE_SIGN_STYLE = Automatic
+CURRENT_PROJECT_VERSION = 1
+DEVELOPMENT_ASSET_PATHS =
+DEVELOPMENT_TEAM = 97PS835FWK
+ENABLE_PREVIEWS = YES
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE = Config/Info.plist
+INFOPLIST_KEY_UILaunchScreen_Generation = YES
+INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault
+INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+MARKETING_VERSION = 0.1.0
+PRODUCT_BUNDLE_IDENTIFIER = com.sapurepo.cutin
+PRODUCT_NAME = $(TARGET_NAME)
+SWIFT_EMIT_LOC_STRINGS = YES
+
+// 각 브랜치가 자기 파일을 6-clean하게 쓰고 여기서 한 번에 플립한다 (계획 "Swift 6 전환 전략").
+// 철수 조건: 플립 후 하루 초과로 막히면 5.0 복귀(이 한 줄) 후 0.2.0 첫 브랜치로.
+SWIFT_VERSION = 6.0
+
+TARGETED_DEVICE_FAMILY = 1

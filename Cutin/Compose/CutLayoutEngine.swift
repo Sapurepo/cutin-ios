@@ -13,6 +13,34 @@ enum CutLayoutEngine {
     /// 컷 수와 레이아웃에 맞는 셀 사각형들을 정사각 `rect` 안에서 계산한다.
     /// 반환 순서는 컷 인덱스 순서와 같다.
     static func cells(count: CutCount, layout: CutLayout, in rect: CGRect, gutter: CGFloat) -> [CGRect] {
+        let cells = rects(count: count, layout: layout, in: rect, gutter: gutter)
+        assert(holdsInvariants(cells, count: count, in: rect), "레이아웃 불변식 위반: \(count.rawValue)컷 \(layout)")
+        return cells
+    }
+
+    /* 테스트 타깃이 없는 동안 레이아웃의 유일한 실행 검증.
+     *
+     * 특히 아래 2xN 기본 분기의 `count.rawValue / columns`는 정수 나눗셈이라, 홀수 컷 수가
+     * 추가되면(3컷·5컷) 조용히 셀을 하나 덜 만들고 마지막 컷이 사라진다. 셀 수 불일치는
+     * 그 자리에서 잡힌다. `assert`는 릴리즈에서 조건식째로 평가되지 않는다. */
+    private static func holdsInvariants(_ cells: [CGRect], count: CutCount, in rect: CGRect) -> Bool {
+        guard cells.count == count.rawValue else { return false }
+
+        // 좌표 누적 오차 허용치. 셀 변 길이는 최소 수십 pt이므로 이 값으로 겹침을 놓치지 않는다.
+        let epsilon: CGFloat = 0.01
+        let bounds = rect.insetBy(dx: -epsilon, dy: -epsilon)
+
+        for (index, cell) in cells.enumerated() {
+            guard cell.width > 0, cell.height > 0, bounds.contains(cell) else { return false }
+            for other in cells[(index + 1)...] {
+                let overlap = cell.intersection(other)
+                guard overlap.isNull || overlap.width < epsilon || overlap.height < epsilon else { return false }
+            }
+        }
+        return true
+    }
+
+    private static func rects(count: CutCount, layout: CutLayout, in rect: CGRect, gutter: CGFloat) -> [CGRect] {
         switch (count, layout) {
         case (.one, _):
             return [rect]

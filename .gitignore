@@ -2,6 +2,9 @@
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
+## macOS
+.DS_Store
+
 ## User settings
 xcuserdata/
 
@@ -41,6 +44,8 @@ playground.xcworkspace
 #
 # Add this line if you want to avoid checking in source code from the Xcode workspace
 # *.xcworkspace
+# 워크스페이스는 커밋한다 — contents.xcworkspacedata는 프로젝트 참조 한 줄이라 팀이 공유해야
+# 하고, 개인 UI 상태는 위 xcuserdata/ 규칙이 이미 걸러낸다.
 
 # Carthage
 #
