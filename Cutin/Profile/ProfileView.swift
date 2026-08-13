@@ -28,8 +28,12 @@ struct ProfileView: View {
         ScrollView {
             VStack(spacing: Spacing.x6) {
                 header
-                stats
-                grid
+                if isIndexUnreadable {
+                    indexNotice
+                } else {
+                    stats
+                    grid
+                }
             }
             .padding(.top, Spacing.x4)
         }
@@ -56,9 +60,11 @@ struct ProfileView: View {
 
     private var header: some View {
         VStack(spacing: Spacing.x3) {
-            // 이니셜 원형 아바타. PhotosPicker는 읽기 권한 키가 추가로 필요해 0.2.0.
+            /* 이니셜 원형 아바타. PhotosPicker는 읽기 권한 키가 추가로 필요해 0.2.0.
+             * 서체는 본문 계열(Pretendard) — 이니셜은 보통 한글인데 Geist는 라틴 전용이라
+             * 한글에 걸면 시스템 폰트로 조용히 폴백해 바로 아래 숫자와 어긋난다. */
             Text(profile.initial)
-                .font(Typography.font(.latin, .semibold, size: 34))
+                .font(Typography.font(.body, .semibold, size: 34))
                 .foregroundStyle(palette.accentOn)
                 .frame(width: 84, height: 84)
                 .background(palette.accent, in: .circle)
@@ -79,6 +85,25 @@ struct ProfileView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /* 인덱스를 읽지 못하면 posts가 비지만 **데이터가 없는 게 아니다.** 그대로 그리면
+     * 프로필이 "포스트 0"과 촬영 권유를 내놓는데, 그 촬영은 쓰기 금지에 걸려 저장이 거부된다 —
+     * 피드가 isWriteBlocked로 막은 것과 같은 상황을 여기서도 막는다. 수치는 모르면 숨긴다. */
+    private var isIndexUnreadable: Bool {
+        if case .unwritable = store.indexStatus { return true }
+        return false
+    }
+
+    private var indexNotice: some View {
+        Text("목록을 읽을 수 없어 기록을 보여드릴 수 없어요. 앱을 다시 켜보세요")
+            .font(Typography.caption)
+            .foregroundStyle(palette.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.x3)
+            .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
+            .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
+            .padding(.horizontal, Spacing.x4)
     }
 
     // MARK: - 통계
