@@ -51,6 +51,12 @@ final class AuthSession {
         return false
     }
 
+    /// 로그인한 사용자의 id. "내 포스트인가"를 가르는 데 화면들이 쓴다.
+    var userId: UUID? {
+        if case .signedIn(let profile) = phase { return profile.id }
+        return nil
+    }
+
     // MARK: - 시작
 
     /* 앱 시작 시 한 번. 저장된 토큰을 전송 계층에 심고 프로필을 확인한다.
@@ -286,13 +292,7 @@ final class AuthSession {
         case APIError.server(_, _, let message, _):
             return message
         default:
-            /* 진단용 — 원인 확정 후 되돌린다. 이 분기는 카카오 SDK 오류·디코딩 실패를 한 문장으로
-             * 뭉개서, 실기기에서 재현해도 무엇이 틀렸는지 화면에 남지 않는다. */
-            #if DEBUG
-                return "로그인에 실패했어요. 잠시 후 다시 시도해주세요\n\n\(String(describing: error))"
-            #else
-                return "로그인에 실패했어요. 잠시 후 다시 시도해주세요"
-            #endif
+            return "로그인에 실패했어요. 잠시 후 다시 시도해주세요"
         }
     }
 }
