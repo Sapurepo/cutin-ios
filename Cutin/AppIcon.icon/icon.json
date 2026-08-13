@@ -1,7 +1,17 @@
 {
-  "fill" : {
-    "solid" : "extended-gray:1.00000,1.00000"
-  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "extended-gray:0.00000,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "extended-gray:0.00000,1.00000"
+      }
+    }
+  ],
   "groups" : [
     {
       "layers" : [
@@ -9,8 +19,9 @@
           "fill" : {
             "solid" : "extended-gray:1.00000,1.00000"
           },
-          "image-name" : "Cuts.svg",
-          "name" : "Cuts"
+          "glass" : true,
+          "image-name" : "Cut1.svg",
+          "name" : "위 팔"
         }
       ],
       "shadow" : {
@@ -26,22 +37,13 @@
     {
       "layers" : [
         {
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "extended-gray:1.00000,1.00000"
-              }
-            }
-          ],
-          "image-name" : "Accent.svg",
-          "name" : "Accent",
-          "opacity" : 1
+          "blend-mode" : "normal",
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "glass" : true,
+          "image-name" : "Cut2.svg",
+          "name" : "기둥 위"
         }
       ],
       "shadow" : {
@@ -51,21 +53,39 @@
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.3
+        "value" : 0.5
       }
     },
     {
       "layers" : [
         {
           "fill" : {
-            "linear-gradient" : [
-              "extended-gray:0.75000,1.00000",
-              "extended-gray:0.50000,1.00000"
-            ]
+            "solid" : "extended-gray:1.00000,1.00000"
           },
-          "glass" : false,
-          "image-name" : "Frame.svg",
-          "name" : "Frame"
+          "glass" : true,
+          "image-name" : "Cut3.svg",
+          "name" : "기둥 아래"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "glass" : true,
+          "image-name" : "Cut4.svg",
+          "name" : "아래 팔"
         }
       ],
       "shadow" : {
