@@ -77,4 +77,52 @@ final class CaptureFlow {
             outputWidth: outputWidth
         )
     }
+
+    // MARK: - 커밋
+
+    /* 저장 진행 상태를 화면이 아니라 플로우가 갖는다.
+     *
+     * 마무리 화면의 `@State`로 두면 저장을 누른 뒤 뒤로 갔다 다시 들어올 때 새 화면이
+     * 만들어지면서 "저장 중"이 초기화된다. 그 상태에서 다시 누르면 **한 번의 촬영이 두 번
+     * 저장돼** JPEG도 포스트도 둘이 된다. 실패 문구도 같은 이유로 죽은 화면에 쓰여 사라진다. */
+    private(set) var isSaving = false
+    private(set) var saveFailure: Error?
+
+    /// 합성 결과를 파일로 남긴다. 성공하면 true.
+    func commit(to store: FeedStore) async -> Bool {
+        guard !isSaving else { return false }
+        isSaving = true
+        saveFailure = nil
+        defer { isSaving = false }
+
+        /* 메타데이터를 **굽기 전에** 붙잡는다. 렌더는 200ms대가 걸리고 그 사이 사용자는
+         * 뒤로 가 보정을 바꾸거나 캡션을 더 칠 수 있다. 나중에 읽으면 파일은 옛 선택으로
+         * 구워졌는데 인덱스에는 새 선택이 적혀, 목록과 그림이 서로 다른 말을 한다. */
+        let request = compositionRequest(outputWidth: CutCompositor.saveWidth)
+        let bakedCount = count
+        let bakedLayout = template.layout
+        let bakedFrameID = template.frame.id
+        let bakedFilterID = filterID
+        let bakedCaption = caption
+
+        let baked = await Task.detached(priority: .userInitiated) {
+            CutCompositor.render(request)
+        }.value
+
+        do {
+            try store.save(
+                image: baked,
+                count: bakedCount,
+                layout: bakedLayout,
+                frameID: bakedFrameID,
+                filterID: bakedFilterID,
+                caption: bakedCaption
+            )
+            return true
+        } catch {
+            // 실패했는데 피드로 넘어가면 사용자는 저장됐다고 믿는다.
+            saveFailure = error
+            return false
+        }
+    }
 }

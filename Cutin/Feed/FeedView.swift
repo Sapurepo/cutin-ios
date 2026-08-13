@@ -168,8 +168,9 @@ private struct PostImage: View {
 
     @State private var image: UIImage?
 
-    /// 합성 출력 폭과 같다 — 이보다 크게 요청해도 없는 픽셀이 생기지 않는다.
-    private static let maxPixel: CGFloat = 1080
+    /// 합성 출력 폭 — 이보다 크게 요청해도 없는 픽셀이 생기지 않는다.
+    /// 상수를 여기 또 적으면 합성 폭을 바꿀 때 디코드 상한만 옛 값에 남는다.
+    private static let maxPixel = CutCompositor.saveWidth
 
     var body: some View {
         ZStack {

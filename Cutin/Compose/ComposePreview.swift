@@ -50,15 +50,24 @@ struct ComposePreview: View {
 
     private func render() async {
         guard !flow.cuts.isEmpty else { return }
+
+        /* 칩을 빠르게 훑으면 선택마다 렌더가 시작된다. `Task.detached`는 취소를 물려받지 않으니
+         * 한 번 시작한 합성은 끝까지 간다 — 컷마다 12MP를 축소하는 일이 겹쳐 쌓인다.
+         * `Task.sleep`은 취소되므로, 여기서 걸러 마지막 선택만 굽는다. */
+        try? await Task.sleep(for: .milliseconds(80))
+        guard !Task.isCancelled else { return }
+
         isRendering = true
-        defer { isRendering = false }
 
         let request = flow.compositionRequest(outputWidth: Self.width)
         let rendered = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
         }.value
 
+        /* 취소됐으면 `isRendering`을 건드리지 않고 나간다. defer로 내리면 뒤늦게 끝난 옛 렌더가
+         * 새 렌더의 깃발을 끄고, 그러면 합성이 도는 중에 스피너가 사라진다. */
         guard !Task.isCancelled else { return }
         image = rendered
+        isRendering = false
     }
 }
