@@ -53,6 +53,14 @@ final class CaptureFlow {
         writeDraftMeta()
     }
 
+    /* 만료를 다시 판정한다. §5.3은 "읽는 시점"이라고 못박았지만 이 객체는 앱 수명이라
+     * `init`의 한 번만으로는 며칠 켜 둔 기기에서 30시간 지난 draft를 계속 이어쓰기로 내놓는다.
+     * 진행 중인 촬영이 메모리에 있으면 건드리지 않는다 — 파일 상태로 덮어쓸 이유가 없다. */
+    func refreshDraft() {
+        guard cuts.isEmpty else { return }
+        draft = drafts.load()
+    }
+
     func configure(count: CutCount, mode: CaptureMode) {
         self.count = count
         self.mode = mode

@@ -8,12 +8,15 @@ import SwiftUI
 
 struct DraftBlockSheet: View {
     let draft: DraftStore.Draft
-    let thumbnail: UIImage?
+    /// 썸네일은 이 시트가 직접 든다. 셸의 `@State`로 두면 두 번째 표시에서 **이전 draft의**
+    /// 첫 컷이 한두 프레임 비친다 — 시트는 표시마다 새로 만들어지므로 여기가 제자리다.
+    let loadThumbnail: () async -> UIImage?
     let onResume: () -> Void
     let onDiscard: () -> Void
 
     @Environment(\.palette) private var palette
-    @Environment(\.dismiss) private var dismiss
+
+    @State private var thumbnail: UIImage?
 
     var body: some View {
         VStack(spacing: Spacing.x5) {
@@ -34,6 +37,7 @@ struct DraftBlockSheet: View {
         .padding(Spacing.x5)
         .presentationDetents([.height(340)])
         .background(palette.bg)
+        .task { thumbnail = await loadThumbnail() }
     }
 
     private var header: some View {

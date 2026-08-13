@@ -18,7 +18,7 @@ struct RootView: View {
     @Environment(CaptureFlow.self) private var flow
 
     @State private var coordinator = AppCoordinator()
-    @State private var draftThumbnail: UIImage?
+    @State private var pendingIntent: CaptureIntent?
 
     var body: some View {
         TabView(selection: tabSelection) {
@@ -45,15 +45,24 @@ struct RootView: View {
         .fullScreenCover(isPresented: $coordinator.isCapturePresented) {
             captureFlow
         }
-        .sheet(isPresented: $coordinator.isDraftBlockPresented) {
+        /* 촬영 커버는 시트가 **완전히 닫힌 뒤** 연다. 같은 갱신에서 시트를 닫고 커버를 열면
+         * 아직 사라지는 중인 모달 위에 새 모달을 올리라고 시키는 셈이라 커버가 조용히 안 뜨고,
+         * 그 사이 draft는 이미 지워져 사용자가 아무것도 없는 탭 화면에 남는다. */
+        .sheet(isPresented: $coordinator.isDraftBlockPresented, onDismiss: runPendingIntent) {
             draftBlock
         }
         .environment(\.palette, Palette.of(colorScheme))
         .tint(Palette.of(colorScheme).accent)
-        /* 포그라운드를 떠나기 직전에 draft 메타를 내린다 — 마지막 컷 이후에 고른 템플릿·보정·캡션이
-         * 여기서 파일로 남는다. 강제 종료도 백그라운드를 지나므로 이 지점이 마지막 기회다. */
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { flow.persistDraftMeta() }
+            if phase == .active {
+                /* 만료는 읽는 시점 판정이지만(§5.3) 이 객체는 앱 수명이라 시작 시 한 번만으로는
+                 * 며칠 켜 둔 기기에서 지난 draft를 계속 내놓는다. 돌아올 때 다시 읽는다. */
+                flow.refreshDraft()
+            } else {
+                /* 떠나기 직전에 draft 메타를 내린다 — 마지막 컷 이후에 고른 템플릿·보정·캡션이
+                 * 여기서 파일로 남는다. 강제 종료도 백그라운드를 지나므로 마지막 기회다. */
+                flow.persistDraftMeta()
+            }
         }
     }
 
@@ -67,29 +76,47 @@ struct RootView: View {
 
     // MARK: - 미완료 촬영 차단 (§5.3)
 
+    /// 시트가 닫힌 **뒤에** 할 일. 시트 안에서 draft를 지우면 시트 내용이 사라져 빈 상자가 남는다.
+    private enum CaptureIntent { case fresh, resume }
+
     @ViewBuilder
     private var draftBlock: some View {
         if let draft = flow.draft {
             DraftBlockSheet(
                 draft: draft,
-                thumbnail: draftThumbnail,
-                onResume: resumeDraft,
-                onDiscard: {
-                    flow.discardDraft()
-                    coordinator.startCapture()
-                }
+                loadThumbnail: { await flow.draftThumbnail(maxPixel: 160) },
+                onResume: { close(with: .resume) },
+                onDiscard: { close(with: .fresh) }
             )
             .environment(\.palette, Palette.of(colorScheme))
-            .task { draftThumbnail = await flow.draftThumbnail(maxPixel: 160) }
         }
     }
 
-    private func resumeDraft() {
-        Task {
-            let complete = await flow.resumeDraft() && flow.isComplete
-            /* 되살리지 못했으면(파일이 사라졌다) 이 시점에 draft가 정리돼 있다 —
-             * 그대로 새 촬영을 연다. 사용자를 빈 시트에 남기지 않는다. */
-            coordinator.resumeCapture(isComplete: complete)
+    private func close(with intent: CaptureIntent) {
+        pendingIntent = intent
+        coordinator.isDraftBlockPresented = false
+    }
+
+    private func runPendingIntent() {
+        guard let intent = pendingIntent else { return }
+        pendingIntent = nil
+
+        switch intent {
+        case .fresh:
+            flow.discardDraft()
+            coordinator.startCapture()
+
+        case .resume:
+            Task {
+                guard await flow.resumeDraft() else {
+                    /* 되살리지 못했다(컷 파일이 사라졌거나 디코드가 깨졌다). 이 시점에 draft는
+                     * 정리돼 있다. 카메라로 바로 보내면 `configure`를 건너뛰어 사용자가 고르지도
+                     * 않은 컷 수·방식(메모리에 남아 있던 값)으로 새 촬영이 시작된다 — 설정부터 연다. */
+                    coordinator.startCapture()
+                    return
+                }
+                coordinator.resumeCapture(isComplete: flow.isComplete)
+            }
         }
     }
 
@@ -115,17 +142,24 @@ struct RootView: View {
      * 실수로 닫히는 경로가 생긴다. */
     private var captureFlow: some View {
         NavigationStack(path: $coordinator.capturePath) {
-            CaptureSetupView(flow: flow) {
-                coordinator.advanceCapture(to: .camera)
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    /* 메모리만 비운다. flow는 앱 수명이라 비우지 않으면 찍은 컷(원본 해상도
-                     * UIImage)이 프로세스가 죽을 때까지 남는다. 파일로 내려간 draft는 그대로
-                     * 두는 것이 §5.3이다 — 다음 진입에서 차단 시트로 이어 쓴다. */
-                    Button("닫기") {
-                        flow.clearMemory()
-                        coordinator.isCapturePresented = false
+            Group {
+                if coordinator.isResumingDraft {
+                    // 이어 쓰는 촬영에는 설정 화면이 없다 — AppCoordinator.isResumingDraft 주석 참조.
+                    cameraStep
+                } else {
+                    CaptureSetupView(flow: flow) {
+                        coordinator.advanceCapture(to: .camera)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            /* 메모리만 비운다. flow는 앱 수명이라 비우지 않으면 찍은 컷(원본 해상도
+                             * UIImage)이 프로세스가 죽을 때까지 남는다. 파일로 내려간 draft는 그대로
+                             * 두는 것이 §5.3이다 — 다음 진입에서 차단 시트로 이어 쓴다. */
+                            Button("닫기") {
+                                flow.clearMemory()
+                                coordinator.isCapturePresented = false
+                            }
+                        }
                     }
                 }
             }
@@ -135,13 +169,17 @@ struct RootView: View {
         }
     }
 
+    private var cameraStep: some View {
+        CaptureView(flow: flow) {
+            coordinator.advanceCapture(to: .template)
+        }
+    }
+
     @ViewBuilder
     private func destination(_ step: CaptureStep) -> some View {
         switch step {
         case .camera:
-            CaptureView(flow: flow) {
-                coordinator.advanceCapture(to: .template)
-            }
+            cameraStep
         case .template:
             TemplateStepView(flow: flow) {
                 coordinator.advanceCapture(to: .filter)

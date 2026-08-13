@@ -47,18 +47,27 @@ final class AppCoordinator {
 
     var isDraftBlockPresented = false
 
+    /* 이어 쓰는 촬영은 **설정 화면을 루트로 두지 않는다.**
+     *
+     * 처음에는 경로에 `.camera`를 밀어 넣어 "뒤로 가면 재촬영 화면"이 되게 했는데, 그것으로는
+     * 막히지 않았다. 카메라 화면의 X는 커버를 닫는 게 아니라 스택을 pop해서 촬영 설정에
+     * 착륙하고(스와이프 뒤로도 같다), 거기서 `촬영 시작`을 누르면 `configure`가 이어 쓰던
+     * draft를 확인도 없이 지운다 — §5.3이 차단 시트로 막으려던 바로 그 일이다.
+     *
+     * 그래서 설정 화면 자체를 스택에서 뺀다. 이어 쓰는 동안 컷 수·방식은 이미 정해져 있으므로
+     * 설정 화면은 의미도 없다. */
+    private(set) var isResumingDraft = false
+
     func startCapture() {
-        isDraftBlockPresented = false
+        isResumingDraft = false
         capturePath = []
         isCapturePresented = true
     }
 
-    /// draft를 이어서 쓴다. 컷이 덜 찼으면 카메라로, 다 찼으면 편집 첫 단계로 보낸다.
-    /// 카메라를 스택에 남기는 이유: 뒤로 가면 재촬영이 있는 화면이어야 한다. 촬영 설정으로
-    /// 돌아가 버리면 거기서 `촬영 시작`을 누르는 순간 이어 쓰던 draft가 사라진다.
+    /// draft를 이어서 쓴다. 카메라가 루트가 되고, 컷이 다 찼으면 편집 첫 단계를 그 위에 올린다.
     func resumeCapture(isComplete: Bool) {
-        isDraftBlockPresented = false
-        capturePath = isComplete ? [.camera, .template] : [.camera]
+        isResumingDraft = true
+        capturePath = isComplete ? [.template] : []
         isCapturePresented = true
     }
 

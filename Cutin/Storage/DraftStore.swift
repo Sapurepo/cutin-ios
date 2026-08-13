@@ -26,8 +26,6 @@ struct DraftStore: Sendable {
         var templateID: String
         var filterID: FilterID
         var caption: String
-
-        var isComplete: Bool { cutCount >= count.rawValue }
     }
 
     /// 24h(§5.3 확정). 만료는 **읽는 시점**에 판정한다 — 로컬 전용 단계에서는 앱이 꺼져 있는 동안
@@ -63,7 +61,7 @@ struct DraftStore: Sendable {
             return nil
         }
 
-        let present = (0..<draft.cutCount).prefix { vault.exists(cutName($0)) }.count
+        let present = (0..<draft.cutCount).prefix { belongs($0, to: draft) }.count
         guard present > 0 else {
             clear()
             return nil
@@ -72,10 +70,29 @@ struct DraftStore: Sendable {
         return draft
     }
 
+    /* 이 draft의 컷인가. 존재만 보면 **이전 촬영의 잔여 파일**을 셀 수 있다: 컷 쓰기는 셔터를
+     * 막지 않으려고 떼어 보내므로 `clear()` 뒤에 늦게 착지할 수 있고, 그러면 유효한 인덱스에
+     * 남의 사진이 놓인다. 생성 시각이 이 draft보다 앞서면 이 촬영의 것이 아니다.
+     * (원자적 쓰기는 임시 파일을 rename하므로 덮어쓴 파일도 생성 시각이 새로 잡힌다.) */
+    private func belongs(_ index: Int, to draft: Draft) -> Bool {
+        guard let created = vault.creationDate(cutName(index)) else { return false }
+        // 메타를 먼저 쓰고 파일이 뒤따르는 순서라 약간의 여유를 둔다.
+        return created >= draft.createdAt.addingTimeInterval(-2)
+    }
+
     /// 원본 해상도로 되살린다. 합성이 셀 크기로 다시 줄이므로 상한만 걸어 둔다.
     /// nonisolated이라 호출부가 메인 액터 밖으로 옮겨 실행할 수 있다 — 12MP 디코드 여러 장이다.
+    ///
+    /// 디코드가 깨지면 **거기서 멈춘다.** `compactMap`으로 건너뛰면 뒤 컷이 앞으로 당겨져
+    /// 파일 인덱스와 메모리 슬롯이 어긋나고, 다음 촬영이 그 자리를 덮어써 같은 사진이 두 번
+    /// 들어간다. `load()`가 파일을 세는 규칙과 같아야 한다.
     func loadCuts(_ count: Int) -> [UIImage] {
-        (0..<count).compactMap { files.decode(cutName($0), maxPixel: 4096) }
+        var loaded: [UIImage] = []
+        for index in 0..<count {
+            guard let image = files.decode(cutName(index), maxPixel: 4096) else { break }
+            loaded.append(image)
+        }
+        return loaded
     }
 
     func thumbnail(maxPixel: CGFloat) -> UIImage? {
