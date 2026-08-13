@@ -24,16 +24,50 @@ final class AppCoordinator {
     var capturePath: [CaptureStep] = []
 
     /// 액션 탭(중앙 CTA)은 선택값으로 삼지 않는다 — 탭은 그대로 두고 시트만 연다.
-    func select(_ tab: AppTab) {
+    ///
+    /// `hasDraft`를 인자로 받는 이유: draft가 있는지는 촬영 플로우가 알고, 코디네이터는
+    /// 그 결정을 화면으로 옮기는 일만 한다. 코디네이터가 플로우를 직접 들면 셸이 촬영 상태를
+    /// 소유하게 되고, 그건 앱 수명 상태를 셸에서 뺐던 이유와 반대 방향이다.
+    func select(_ tab: AppTab, hasDraft: Bool) {
         guard !tab.isAction else {
-            startCapture()
+            requestCapture(hasDraft: hasDraft)
             return
         }
         self.tab = tab
     }
 
+    /// 미완료 촬영이 있으면 새 촬영을 열지 않고 차단 시트를 띄운다 (§5.3).
+    func requestCapture(hasDraft: Bool) {
+        if hasDraft {
+            isDraftBlockPresented = true
+        } else {
+            startCapture()
+        }
+    }
+
+    var isDraftBlockPresented = false
+
+    /* 이어 쓰는 촬영은 **설정 화면을 루트로 두지 않는다.**
+     *
+     * 처음에는 경로에 `.camera`를 밀어 넣어 "뒤로 가면 재촬영 화면"이 되게 했는데, 그것으로는
+     * 막히지 않았다. 카메라 화면의 X는 커버를 닫는 게 아니라 스택을 pop해서 촬영 설정에
+     * 착륙하고(스와이프 뒤로도 같다), 거기서 `촬영 시작`을 누르면 `configure`가 이어 쓰던
+     * draft를 확인도 없이 지운다 — §5.3이 차단 시트로 막으려던 바로 그 일이다.
+     *
+     * 그래서 설정 화면 자체를 스택에서 뺀다. 이어 쓰는 동안 컷 수·방식은 이미 정해져 있으므로
+     * 설정 화면은 의미도 없다. */
+    private(set) var isResumingDraft = false
+
     func startCapture() {
+        isResumingDraft = false
         capturePath = []
+        isCapturePresented = true
+    }
+
+    /// draft를 이어서 쓴다. 카메라가 루트가 되고, 컷이 다 찼으면 편집 첫 단계를 그 위에 올린다.
+    func resumeCapture(isComplete: Bool) {
+        isResumingDraft = true
+        capturePath = isComplete ? [.template] : []
         isCapturePresented = true
     }
 
