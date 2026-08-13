@@ -1,13 +1,17 @@
-/* 피드 — 스파이크는 "합성 결과가 실제 파일로 남는가"를 눈으로 확인하는 용도라 한 화면으로 끝낸다.
- * 무한 스크롤·반응·댓글(명세 §4.1, §7)은 범위 밖. */
+/* 피드 — 명세 §4.1.
+ *
+ * 상세는 시트가 아니라 **푸시**다. 시트는 "여기서 잠깐 보고 돌아온다"는 뜻인데, 상세에는
+ * 삭제·보관처럼 목록을 바꾸는 동작이 있어 되돌아온 목록이 달라져 있다. 푸시는 그 관계를
+ * 그대로 표현하고, 뒤로 가기가 시스템 제스처로 통일된다.
+ *
+ * 무한 스크롤(커서 페이징)은 넣지 않았다 — 이유는 PR 본문에 적었다. 로컬 인덱스는 이미
+ * 메모리에 다 있고, 실제 비용은 이미지 디코드이며 그건 LazyVStack이 이미 미룬다. */
 
 import SwiftUI
 
 struct FeedView: View {
     @Environment(FeedStore.self) private var store
     @Environment(\.palette) private var palette
-
-    @State private var selected: ComposedPost?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,8 +32,11 @@ struct FeedView: View {
         }
         .background(palette.bg)
         .navigationTitle("CUTIN")
-        .sheet(item: $selected) { post in
-            detail(post)
+        .navigationDestination(for: Route.self) { route in
+            switch route {
+            case .postDetail(let id):
+                PostDetailView(id: id)
+            }
         }
     }
 
@@ -50,8 +57,10 @@ struct FeedView: View {
         ScrollView {
             LazyVStack(spacing: Spacing.x6) {
                 ForEach(store.posts) { post in
-                    card(post)
-                        .onTapGesture { selected = post }
+                    NavigationLink(value: Route.postDetail(post.id)) {
+                        PostCard(post: post)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, Spacing.x4)
@@ -107,87 +116,5 @@ struct FeedView: View {
         .padding(Spacing.x3)
         .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
         .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
-    }
-
-    private func card(_ post: ComposedPost) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.x2) {
-            PostImage(post: post)
-
-            HStack(spacing: Spacing.x2) {
-                Text(post.createdAt, format: .dateTime.year().month().day())
-                    .font(Typography.numeric)
-                    .foregroundStyle(palette.textSecondary)
-                if post.filterID != .original {
-                    Text(post.filterID.displayName)
-                        .font(Typography.chip)
-                        .foregroundStyle(palette.textSecondary)
-                        .padding(.horizontal, Spacing.x2)
-                        .padding(.vertical, 2)
-                        .tokenBorder(Capsule(), color: palette.border)
-                }
-            }
-
-            if !post.caption.isEmpty {
-                Text(post.caption)
-                    .font(Typography.bodyText)
-                    .foregroundStyle(palette.textPrimary)
-            }
-        }
-    }
-
-    private func detail(_ post: ComposedPost) -> some View {
-        NavigationStack {
-            ScrollView {
-                PostImage(post: post)
-                    .padding(Spacing.x4)
-            }
-            .background(palette.bg)
-            .navigationTitle("포스트")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("삭제", role: .destructive) {
-                        // 실패했는데 시트를 닫으면 포스트는 남아 있고 삭제는 아무 일도 안 한 것처럼
-                        // 보인다. 실패하면 화면에 머무른다 — 배너는 하드닝 브랜치에서 붙인다.
-                        guard (try? store.delete(post)) != nil else { return }
-                        selected = nil
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* 포스트 이미지 — 디코드를 메인 액터 밖으로 보내고 자리를 먼저 잡는다.
- * 카드와 상세가 같은 크기(저장 해상도)를 쓰므로 캐시 항목도 하나로 공유된다. */
-private struct PostImage: View {
-    let post: ComposedPost
-
-    @Environment(FeedStore.self) private var store
-    @Environment(\.palette) private var palette
-
-    @State private var image: UIImage?
-
-    /// 합성 출력 폭 — 이보다 크게 요청해도 없는 픽셀이 생기지 않는다.
-    /// 상수를 여기 또 적으면 합성 폭을 바꿀 때 디코드 상한만 옛 값에 남는다.
-    private static let maxPixel = CutCompositor.saveWidth
-
-    var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                // 로드 전 레이아웃이 튀지 않게 정사각으로 자리를 잡는다 (템플릿 대부분이 1:1).
-                RoundedRectangle(cornerRadius: Radius.md)
-                    .fill(palette.surfaceSunken)
-                    .aspectRatio(1, contentMode: .fit)
-            }
-        }
-        .clipShape(.rect(cornerRadius: Radius.md))
-        .task(id: post.id) {
-            image = await store.image(for: post, maxPixel: Self.maxPixel)
-        }
     }
 }

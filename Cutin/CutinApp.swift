@@ -10,12 +10,15 @@ import SwiftUI
 struct CutinApp: App {
     @State private var store = FeedStore()
     @State private var flow = CaptureFlow()
+    /// 보관은 피드·보관 탭·상세가 함께 읽는 상태라 앱이 소유한다.
+    @State private var archive = ArchiveStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(store)
                 .environment(flow)
+                .environment(archive)
         }
     }
 }

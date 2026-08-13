@@ -39,6 +39,11 @@ struct PostFileStore: Sendable {
         vault.creationDate(name)
     }
 
+    /// 공유·사진 앱 저장은 디코드한 이미지가 아니라 원본 파일을 넘긴다 — 재인코딩 손실이 없다.
+    func url(_ name: String) -> URL {
+        vault.url(name)
+    }
+
     /// `maxPixel`은 긴 변 기준 상한. 호출자가 표시 크기를 알고 넘긴다.
     /// nonisolated + Sendable이라 호출부에서 메인 액터 밖으로 옮겨 실행할 수 있다.
     func decode(_ name: String, maxPixel: CGFloat) -> UIImage? {

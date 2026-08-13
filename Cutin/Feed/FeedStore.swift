@@ -43,6 +43,16 @@ final class FeedStore {
 
     // MARK: - 읽기
 
+    /// Route가 모델이 아니라 id를 나르므로(규칙 4) 상세 화면이 여기서 되찾는다.
+    func post(id: UUID) -> ComposedPost? {
+        posts.first { $0.id == id }
+    }
+
+    /// 공유·사진 앱 저장이 쓰는 원본 파일 경로. 이미지를 다시 인코딩하지 않고 그대로 넘긴다.
+    func imageURL(for post: ComposedPost) -> URL {
+        files.url(post.imageFilename)
+    }
+
     /// `maxPixel`은 긴 변 기준 상한 — 호출부가 표시 크기를 알고 넘긴다.
     func image(for post: ComposedPost, maxPixel: CGFloat) async -> UIImage? {
         let name = post.imageFilename
