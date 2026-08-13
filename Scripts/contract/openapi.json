@@ -788,6 +788,44 @@
         ]
       }
     },
+    "/frames": {
+      "get": {
+        "description": "컷 그리드를 감싸는 외형이다. 길이 값은 캔버스 폭 대비 비율이라 출력 해상도와 무관하다.",
+        "operationId": "PostsController_listFrames",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FramesResponseDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 필요",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "프레임(외형) 목록",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
     "/posts": {
       "post": {
         "description": "draft는 사용자당 1개다. 이미 있으면 409가 나간다.",
@@ -1043,6 +1081,74 @@
           }
         ],
         "summary": "사용자 포스트 목록",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
+    "/users/me/bookmarks": {
+      "get": {
+        "description": "보관한 시각 최신순이다. 포스트 작성 순이 아니다.",
+        "operationId": "PostsController_listBookmarked",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPageDto_Output"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 값이 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 필요",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "보관 목록",
         "tags": [
           "posts"
         ]
@@ -2619,6 +2725,118 @@
         ]
       }
     },
+    "/posts/{id}/bookmark": {
+      "put": {
+        "description": "토글이 아니라 상태 지정이다. 두 번 눌러도 같은 결과이고 보관 목록에 한 번만 남는다.",
+        "operationId": "BookmarksController_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkResultDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 필요",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "보관",
+        "tags": [
+          "bookmarks"
+        ]
+      },
+      "delete": {
+        "description": "보관돼 있지 않아도 200이다.",
+        "operationId": "BookmarksController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkResultDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 필요",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "보관 해제",
+        "tags": [
+          "bookmarks"
+        ]
+      }
+    },
     "/reports": {
       "post": {
         "description": "포스트·댓글·사용자를 신고한다. 같은 대상을 두 번 신고하면 409가 나간다.",
@@ -3105,7 +3323,8 @@
                   "minimum": 0
                 },
                 "aspectRatio": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
                 },
                 "slots": {
                   "type": "array",
@@ -3132,7 +3351,8 @@
                       "height"
                     ],
                     "additionalProperties": false
-                  }
+                  },
+                  "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
                 }
               },
               "required": [
@@ -3142,6 +3362,69 @@
                 "cutCount",
                 "aspectRatio",
                 "slots"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "FramesResponseDto_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "background": {
+                  "type": "string"
+                },
+                "foreground": {
+                  "type": "string"
+                },
+                "padding": {
+                  "type": "number"
+                },
+                "gutter": {
+                  "type": "number"
+                },
+                "cellRadius": {
+                  "type": "number"
+                },
+                "footer": {
+                  "type": "string",
+                  "enum": [
+                    "logoDate",
+                    null
+                  ],
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "background",
+                "foreground",
+                "padding",
+                "gutter",
+                "cellRadius",
+                "footer"
               ],
               "additionalProperties": false
             }
@@ -3218,7 +3501,8 @@
                 "minimum": 0
               },
               "aspectRatio": {
-                "type": "string"
+                "type": "string",
+                "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
               },
               "slots": {
                 "type": "array",
@@ -3245,7 +3529,8 @@
                     "height"
                   ],
                   "additionalProperties": false
-                }
+                },
+                "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
               }
             },
             "required": [
@@ -3257,6 +3542,58 @@
               "slots"
             ],
             "additionalProperties": false
+          },
+          "frame": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "background": {
+                "type": "string"
+              },
+              "foreground": {
+                "type": "string"
+              },
+              "padding": {
+                "type": "number"
+              },
+              "gutter": {
+                "type": "number"
+              },
+              "cellRadius": {
+                "type": "number"
+              },
+              "footer": {
+                "type": "string",
+                "enum": [
+                  "logoDate",
+                  null
+                ],
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "background",
+              "foreground",
+              "padding",
+              "gutter",
+              "cellRadius",
+              "footer"
+            ],
+            "additionalProperties": false,
+            "nullable": true
           },
           "status": {
             "type": "string",
@@ -3452,12 +3789,16 @@
               "mine"
             ],
             "additionalProperties": false
+          },
+          "bookmarked": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
           "author",
           "template",
+          "frame",
           "status",
           "visibility",
           "caption",
@@ -3467,7 +3808,8 @@
           "publishedAt",
           "createdAt",
           "commentCount",
-          "reactions"
+          "reactions",
+          "bookmarked"
         ],
         "additionalProperties": false
       },
@@ -3529,7 +3871,8 @@
                       "minimum": 0
                     },
                     "aspectRatio": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
                     },
                     "slots": {
                       "type": "array",
@@ -3556,7 +3899,8 @@
                           "height"
                         ],
                         "additionalProperties": false
-                      }
+                      },
+                      "description": "컷 그리드 영역 기준이며 프레임 여백(padding·gutter)과 푸터를 포함하지 않는다."
                     }
                   },
                   "required": [
@@ -3568,6 +3912,58 @@
                     "slots"
                   ],
                   "additionalProperties": false
+                },
+                "frame": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "background": {
+                      "type": "string"
+                    },
+                    "foreground": {
+                      "type": "string"
+                    },
+                    "padding": {
+                      "type": "number"
+                    },
+                    "gutter": {
+                      "type": "number"
+                    },
+                    "cellRadius": {
+                      "type": "number"
+                    },
+                    "footer": {
+                      "type": "string",
+                      "enum": [
+                        "logoDate",
+                        null
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "background",
+                    "foreground",
+                    "padding",
+                    "gutter",
+                    "cellRadius",
+                    "footer"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
                 },
                 "status": {
                   "type": "string",
@@ -3763,12 +4159,16 @@
                     "mine"
                   ],
                   "additionalProperties": false
+                },
+                "bookmarked": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
                 "author",
                 "template",
+                "frame",
                 "status",
                 "visibility",
                 "caption",
@@ -3778,7 +4178,8 @@
                 "publishedAt",
                 "createdAt",
                 "commentCount",
-                "reactions"
+                "reactions",
+                "bookmarked"
               ],
               "additionalProperties": false
             }
@@ -3831,6 +4232,12 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "frameId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
             "nullable": true
           },
           "cuts": {
@@ -4408,6 +4815,18 @@
           "total",
           "counts",
           "mine"
+        ],
+        "additionalProperties": false
+      },
+      "BookmarkResultDto_Output": {
+        "type": "object",
+        "properties": {
+          "bookmarked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bookmarked"
         ],
         "additionalProperties": false
       },
