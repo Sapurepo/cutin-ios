@@ -59,6 +59,12 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 | 템플릿 | `GET /templates` — `{id, code, name, cutCount, aspectRatio, slots:[{x,y,width,height}]}` |
 | 열거형 | media `cut·composed·avatar` / post `draft·published·deleted` / visibility `friends·public·private` |
 
+**서버는 아직 배포되지 않았습니다.** 저장소에 운영 주소가 없고 배포 설정 자체가 없습니다
+(`docker-compose`는 로컬용, CI만 존재 · `PUBLIC_BASE_URL` 기본값이 `localhost` · 스토리지는
+로컬 디스크 · `CLAUDE.md`에 "인프라 미정"). 그래서 `Config/Debug.xcconfig`는
+`http://localhost:3000`을, `Release.xcconfig`는 **빈 값**을 가리킵니다 — Release는 첫 API
+호출에서 크래시합니다(조용히 잘못된 주소로 붙는 것보다 낫습니다). 배포되면 한 줄만 채우면 됩니다.
+
 **합성은 클라이언트 몫입니다.** 서버 `postSchema`의 `composed` 필드에 "iOS가 만든 합성본"이라고
 적혀 있습니다 — 0.1.0의 `CutCompositor`가 그대로 쓰입니다.
 
@@ -79,7 +85,7 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 | 공개 범위 UI 없음 | `visibility` 필수 열거형 | 구현한다 |
 | draft를 로컬 파일로 | 서버 draft(`GET /posts/draft`) | 서버가 진실. 로컬 draft는 오프라인 버퍼로 격하 |
 | `posts.json` 로컬 인덱스 | `GET /feed` 커서 | 서버가 진실 |
-| 인증 없음(바로 피드) | 모든 엔드포인트 Bearer | **로그인 + 온보딩(닉네임)까지 넣는다.** Google·Kakao SDK를 SPM으로 도입 |
+| 인증 없음(바로 피드) | 모든 엔드포인트 Bearer | **로그인 + 온보딩(닉네임)까지 넣는다.** 카카오만 — 구글은 도입 취소 |
 | 기존 로컬 포스트 | — | **버린다.** 0.1.0은 실기기 검증도 안 된 개발 빌드였다 |
 | `archive.json` 보관 | **서버 API 없음** | 로컬 유지. [cutin-backend#10](https://github.com/Sapurepo/cutin-backend/issues/10)으로 API 요청 |
 
@@ -87,6 +93,9 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 
 반응·댓글·알림·푸시·팔로우는 API가 있지만 0.2.0에서 다루지 않습니다 — 인증·업로드·포스트
 수명주기·피드가 먼저 서야 그 위에 얹을 수 있습니다.
+
+**구글 로그인도 범위 밖입니다.** 서버는 `google`·`kakao` 둘을 지원하지만(전자는 `id_token`을
+JWKS로 검증, 후자는 `access_token`을 kapi Bearer로 사용) 0.2.0은 카카오만 붙입니다.
 
 ## 관련 저장소
 
@@ -102,10 +111,11 @@ Android는 무기한 연기합니다 (명세 §0.1). 1인 개발 체제에서 �
 
 - Xcode 26 이상 (iOS 26 SDK — `glassEffect` 등 Liquid Glass API 사용)
 - 배포 타깃 iOS 26.0
-- 0.1.0까지 외부 의존성 없음 (SPM 패키지 미사용 — 순정 AVFoundation · Core Image · SwiftUI).
-  0.2.0에서 Google·Kakao 로그인 SDK를 SPM으로 도입하며 이 성질이 깨집니다 — `pbxproj`를
-  건드리므로 0.1.0의 규칙 1(pbxproj를 만지는 브랜치는 하나뿐)에 맞춰 **인증 브랜치 한 곳에
-  몰아** 브랜치 충돌을 막습니다
+- 외부 의존성 2개 (0.1.0까지는 0개였습니다)
+  - `kakao-ios-sdk` 2.28.0 — 카카오 로그인 (`KakaoSDKCommon` · `KakaoSDKAuth` · `KakaoSDKUser`)
+  - `Alamofire` 5.12.0 — **카카오 SDK의 전이 의존.** 직접 쓰지 않습니다
+  - 나머지는 순정입니다 (AVFoundation · Core Image · SwiftUI · Security)
+  - `pbxproj`를 건드리는 변경이라 0.1.0의 규칙 1에 맞춰 **인증 브랜치 한 곳에 몰았습니다**
 
 ## Build & Run
 
@@ -129,6 +139,8 @@ Cutin/
                         ArchiveStore·ProfileStore)를 만들어 환경으로 내린다
   RootView.swift        탭 셸 (네이티브 Liquid Glass) · 촬영 커버 · draft 차단 시트
   AppIcon.icon/         Icon Composer 레이어 문서 (iOS 26 Liquid Glass 아이콘)
+  Auth/                 로그인 게이트 · 카카오 로그인 · 세션 · 토큰 보관(Keychain)
+  Network/              API 기준 주소 · 오류 · 전송(actor) · Contracts/(서버 계약 타입)
   Navigation/           AppTab · Route(id를 나른다) · AppCoordinator(탭·촬영 커버 소유)
   DesignSystem/         cutin-frontend packages/tokens 에서 이식한 토큰·타이포그래피
                         + Components/ (2곳 이상에서 실제로 쓰이는 것만)
@@ -142,10 +154,24 @@ Cutin/
   Archive/ Friends/ Profile/   나머지 탭
   Resources/Fonts/      Pretendard(한글) · Geist(라틴 전용)
 Config/
-  Shared.xcconfig       두 구성 공통 빌드 설정 (SWIFT_VERSION 포함)
+  Shared.xcconfig       두 구성 공통 빌드 설정 (SWIFT_VERSION · 카카오 앱 키 포함)
   Debug/Release.xcconfig  구성별 설정 — 지금은 Shared를 include만 한다
   Info.plist            카메라·사진 앱 권한 문구 + UIAppFonts
 ```
+
+```
+Scripts/
+  contract/             서버 계약 검증 (openapi.json 스냅샷 · 픽스처 생성기 · 바디 대조기)
+  auth/                 인증 흐름 검증 (스텁 서버 · 하니스)
+```
+
+`Scripts/`는 앱 타깃 밖이라 컴파일되지 않습니다. 테스트 타깃이 없는 동안 계약과 인증을
+검사하는 수단이라, 각 폴더 README에 절차와 **음성 대조군**(일부러 깨뜨려 실패가 나오는지)을
+적어 뒀습니다.
+
+> **Keychain은 서명 없이 검증할 수 없습니다.** 아래 컴파일 검증 명령(`CODE_SIGNING_ALLOWED=NO`)으로
+> 빌드한 앱은 엔타이틀먼트가 없어 `SecItemAdd`가 -34018(`errSecMissingEntitlement`)로 실패합니다.
+> 토큰 보관을 확인할 때는 서명을 켜세요.
 
 `Cutin/`은 Xcode의 **file system synchronized group**입니다 — 폴더에 `.swift` 파일을 추가하면
 프로젝트 파일을 건드리지 않아도 자동으로 타깃에 포함됩니다.
