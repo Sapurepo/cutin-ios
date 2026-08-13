@@ -78,11 +78,30 @@ actor APIClient {
         _ = try await perform(method, path, query: query, body: body, authorized: authorized)
     }
 
+    /* 바이트를 그대로 올린다. `send`를 쓸 수 없는 이유가 둘이다:
+     *
+     * ① **본문이 JSON이 아니다.** 이미지 바이트를 그대로 싣고 Content-Type도 서버가 지정한다.
+     * ② **목적지가 서버가 준 URL이다.** 지금은 서버 자신의 `/media/content/...`지만 스토리지
+     *    벤더가 확정되면 외부 절대 URL이 될 수 있어, 경로를 앱이 조립하지 않는다.
+     *
+     * 그래도 401 → 재발급 → 재시도는 똑같이 탄다. `PUT /media/content/{path}`가 `[auth]`이고,
+     * 컷을 여러 장 올리는 동안 토큰이 만료되는 것은 흔한 일이다. */
+    func upload(_ data: Data, to target: UploadTarget) async throws {
+        let url = try url(forTarget: target.url)
+        _ = try await perform(authorized: true) {
+            var request = URLRequest(url: url)
+            request.httpMethod = target.method
+            request.httpBody = data
+            // 서버가 준 헤더를 그대로 싣는다 — Content-Type이 여기 온다.
+            for (key, value) in target.headers {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+            return request
+        }
+    }
+
     // MARK: - 내부
 
-    /* 401이면 재발급 후 **한 번만** 재시도한다. 무한히 돌지 않게 하는 것이 `isRetry`의 전부다 —
-     * 재발급이 성공했는데도 다시 401이 오는 경우(권한이 아예 없는 리소스, 서버 버그)에
-     * 재발급 요청이 끝없이 나가는 것을 막는다. */
     private func perform(
         _ method: Method,
         _ path: String,
@@ -90,11 +109,38 @@ actor APIClient {
         body: (any Encodable & Sendable)?,
         authorized: Bool
     ) async throws -> Data {
+        let url = try url(for: path, query: query)
+        return try await perform(authorized: authorized) {
+            var request = URLRequest(url: url)
+            request.httpMethod = method.rawValue
+            if let body {
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                do {
+                    request.httpBody = try Self.encoder.encode(body)
+                } catch {
+                    // 계약 타입이 인코딩에 실패하는 것은 코드 결함이다 — 서버 탓이 아니다.
+                    throw APIError.decoding(error)
+                }
+            }
+            return request
+        }
+    }
+
+    /* 401이면 재발급 후 **한 번만** 재시도한다. 재발급이 성공했는데도 다시 401이 오는 경우
+     * (권한이 아예 없는 리소스, 서버 버그)에 요청이 끝없이 오가는 것을 막는다.
+     *
+     * 완성된 요청이 아니라 요청을 **만드는 법**을 받는다. JSON 요청과 바이트 업로드가 같은 401
+     * 처리를 타야 하는데, 완성된 `URLRequest`를 받으면 재시도할 때 인증 헤더가 옛 토큰인 채로
+     * 남는다(헤더는 `attempt`가 붙인다). */
+    private func perform(
+        authorized: Bool,
+        _ build: @Sendable () throws -> URLRequest
+    ) async throws -> Data {
         do {
-            return try await attempt(method, path, query: query, body: body, authorized: authorized)
+            return try await attempt(authorized: authorized, build)
         } catch let error as APIError where error.isUnauthorized && authorized && refresher != nil {
             accessToken = try await refreshedToken()
-            return try await attempt(method, path, query: query, body: body, authorized: authorized)
+            return try await attempt(authorized: authorized, build)
         }
     }
 
@@ -116,24 +162,10 @@ actor APIClient {
     }
 
     private func attempt(
-        _ method: Method,
-        _ path: String,
-        query: [String: String],
-        body: (any Encodable & Sendable)?,
-        authorized: Bool
+        authorized: Bool,
+        _ build: @Sendable () throws -> URLRequest
     ) async throws -> Data {
-        var request = URLRequest(url: try url(for: path, query: query))
-        request.httpMethod = method.rawValue
-
-        if let body {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            do {
-                request.httpBody = try Self.encoder.encode(body)
-            } catch {
-                // 계약 타입이 인코딩에 실패하는 것은 코드 결함이다 — 서버 탓이 아니다.
-                throw APIError.decoding(error)
-            }
-        }
+        var request = try build()
 
         /* 인증이 필요한데 토큰이 없으면 **요청을 보내지 않는다.** 보내면 서버가 401을 주고
          * 재발급 경로를 타는데, 애초에 토큰이 없으므로 재발급도 실패한다. 상태를 정직하게
@@ -181,6 +213,16 @@ actor APIClient {
         }
         guard let url = components.url else {
             throw APIError.malformedResponse(status: -1, snippet: "잘못된 쿼리: \(query)")
+        }
+        return url
+    }
+
+    /* 업로드 목적지. 서버가 절대 URL(`http://…/media/content/…`)을 주지만, 스토리지 벤더가
+     * 바뀌거나 리버스 프록시 뒤에 놓이면 상대 경로가 올 수도 있다. 둘 다 받는다 —
+     * `URL(string:relativeTo:)`은 문자열에 스킴이 있으면 기준 주소를 무시한다. */
+    private func url(forTarget target: String) throws -> URL {
+        guard let url = URL(string: target, relativeTo: baseURL) else {
+            throw APIError.malformedResponse(status: -1, snippet: "잘못된 업로드 주소: \(target)")
         }
         return url
     }
