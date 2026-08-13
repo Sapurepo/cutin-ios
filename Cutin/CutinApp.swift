@@ -8,6 +8,8 @@ import SwiftUI
 
 @main
 struct CutinApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+
     @State private var store: PostStore
     @State private var flow = CaptureFlow()
 
@@ -23,6 +25,9 @@ struct CutinApp: App {
     /// 친구 관계와 댓글. 여러 화면이 같은 값을 읽으므로 앱이 소유한다.
     @State private var social: SocialStore
     @State private var comments: CommentStore
+    /// 알림 목록·설정과 푸시 등록. 피드 배지가 읽으므로 앱이 소유한다.
+    @State private var notifications: NotificationStore
+    @State private var push: PushRegistrar
 
     init() {
         KakaoLogin.initialize()
@@ -35,6 +40,12 @@ struct CutinApp: App {
         publisher = PostPublisher(client: client)
         social = SocialStore(client: client)
         comments = CommentStore(client: client)
+        notifications = NotificationStore(client: client)
+        let registrar = PushRegistrar(client: client)
+        push = registrar
+        /* APNs 토큰은 UIKit이 앱 델리게이트 콜백으로만 준다 — SwiftUI에 대응하는 훅이 없다.
+         * 델리게이트에 등록기를 넘겨 받은 토큰을 그대로 흘려보낸다. */
+        AppDelegate.registrar = registrar
     }
 
     var body: some Scene {
@@ -47,6 +58,8 @@ struct CutinApp: App {
                 .environment(publisher)
                 .environment(social)
                 .environment(comments)
+                .environment(notifications)
+                .environment(push)
                 /* 카카오톡에서 되돌아오는 URL. `RootView`가 아니라 여기에 두는 이유는
                  * 로그인 화면(게이트의 다른 분기)에서도 받아야 하기 때문이다. */
                 .onOpenURL { url in _ = KakaoLogin.handle(url) }

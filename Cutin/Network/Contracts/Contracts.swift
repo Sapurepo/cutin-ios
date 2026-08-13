@@ -444,6 +444,81 @@ struct Report: Decodable, Sendable {
     let createdAt: String
 }
 
+// MARK: - 알림 · 디바이스
+
+enum NotificationSlot: String, Sendable, Hashable, CaseIterable {
+    case morning, lunch, evening, night
+}
+
+enum NotificationType: String, Sendable, Hashable {
+    case comment, reaction, follow
+}
+
+/// 알림이 가리키는 곳. 탭했을 때 어디로 갈지 정한다.
+enum NotificationTarget: String, Sendable, Hashable {
+    case post, user
+}
+
+struct AppNotification: Decodable, Sendable, Hashable {
+    let id: UUID
+    let type: ServerEnum<NotificationType>
+    /// 알림을 만든 사람. 시스템 알림이 생기면 이 필드가 nullable이 될 수 있다.
+    let actor: UserSummary
+    let targetType: ServerEnum<NotificationTarget>
+    let targetId: UUID
+    /// 읽은 시각. null이면 안 읽음이다.
+    let readAt: String?
+    let createdAt: String
+}
+
+typealias NotificationPage = Page<AppNotification>
+
+struct UnreadCount: Decodable, Sendable {
+    let count: Int
+}
+
+/// 읽음 처리. **한 번에 100개까지**다(서버 `maxItems`).
+struct MarkReadBody: Encodable, Sendable {
+    let ids: [UUID]
+}
+
+struct NotificationPreferences: Decodable, Sendable, Hashable {
+    let slots: [ServerEnum<NotificationSlot>]
+    let pushEnabled: Bool
+}
+
+/* 슬롯은 **하나 이상**이어야 한다(서버 `minItems: 1`). "알림 끄기"는 슬롯을 비우는 것이 아니라
+ * `pushEnabled: false`다 — 슬롯을 비워 보내면 400이다. */
+struct NotificationPreferencesBody: Encodable, Sendable {
+    let slots: [ServerEnum<NotificationSlot>]
+    let pushEnabled: Bool
+}
+
+struct RegisterDeviceBody: Encodable, Sendable {
+    /// 서버가 지금은 `ios`만 받는다.
+    let platform: String
+    /// APNs 디바이스 토큰(16진 문자열).
+    let pushToken: String
+    let timezone: String
+}
+
+struct RevokeDeviceBody: Encodable, Sendable {
+    let pushToken: String
+}
+
+struct Device: Decodable, Sendable {
+    let id: UUID
+    let platform: String
+    let timezone: String
+}
+
+/* 서비스 상태 확인. **앱이 쓰지 않는다** — 운영용 프로브라 화면에서 할 일이 없다.
+ * 계약 타입만 남겨 둔다(다음에 쓰게 되면 이 파일을 다시 열지 않도록). */
+struct HealthResponse: Decodable, Sendable {
+    let status: String
+    let database: String
+}
+
 // MARK: - optional × nullable
 
 /* "키를 빼기"와 "null을 싣기"를 나누는 표현. 서버가 PATCH를 **보낸 키만** 반영하므로

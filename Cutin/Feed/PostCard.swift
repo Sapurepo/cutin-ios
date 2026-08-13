@@ -96,25 +96,7 @@ struct PostThumbnail: View {
 }
 
 extension Post {
-    /* 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
-     *
-     * 서버가 ISO 8601 문자열로 준다 — 계약 타입이 `Date`로 디코드하지 않는 이유는
-     * `Contracts.swift` 머리말에 적혀 있다(형식이 하나라도 어긋나면 페이지가 통째로 사라진다).
-     * 파싱 실패는 nil이고, 화면은 날짜를 그리지 않는다. */
-    var displayDate: Date? {
-        let text = publishedAt ?? createdAt
-        return Post.isoParser.date(from: text) ?? Post.isoParserNoFraction.date(from: text)
-    }
-
-    /* `ISO8601DateFormatter`는 `Sendable`이 아니라 Swift 6에서 전역 상수로 둘 수 없다.
-     * 파서는 만든 뒤 설정을 바꾸지 않고 파싱만 하므로 실제 공유 가변 상태가 없어
-     * `nonisolated(unsafe)`로 표시한다 — 호출마다 새로 만들면 목록 스크롤에서 셀마다
-     * 포매터를 짓게 된다(`Filters.swift`의 `CIContext`와 같은 판단이다). */
-    nonisolated(unsafe) private static let isoParser: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    nonisolated(unsafe) private static let isoParserNoFraction = ISO8601DateFormatter()
+    /// 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
+    /// 파싱은 `String.isoDate`가 한다 — 알림 목록도 같은 형식을 읽는다.
+    var displayDate: Date? { (publishedAt ?? createdAt).isoDate }
 }
