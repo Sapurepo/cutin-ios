@@ -1,9 +1,6 @@
 {
   "fill" : {
-    "linear-gradient" : [
-      "extended-gray:0.75000,1.00000",
-      "extended-gray:1.00000,1.00000"
-    ]
+    "solid" : "extended-gray:1.00000,1.00000"
   },
   "groups" : [
     {
@@ -62,10 +59,11 @@
         {
           "fill" : {
             "linear-gradient" : [
-              "display-p3:0.96404,0.96404,0.96404,1.00000",
-              "extended-gray:1.00000,1.00000"
+              "extended-gray:0.75000,1.00000",
+              "extended-gray:0.50000,1.00000"
             ]
           },
+          "glass" : false,
           "image-name" : "Frame.svg",
           "name" : "Frame"
         }
