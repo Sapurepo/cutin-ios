@@ -14,13 +14,26 @@ struct CutinApp: App {
     @State private var archive = ArchiveStore()
     @State private var profile = ProfileStore()
 
+    /* 전송 계층과 세션은 앱 하나에 하나다. 토큰과 진행 중인 재발급이 여기 있으므로 화면마다
+     * 새로 만들면 각 화면이 자기 토큰을 들고 따로 재발급한다. */
+    @State private var session: AuthSession
+
+    init() {
+        KakaoLogin.initialize()
+        session = AuthSession(client: APIClient())
+    }
+
     var body: some Scene {
         WindowGroup {
-            RootView()
+            AuthGate()
                 .environment(store)
                 .environment(flow)
                 .environment(archive)
                 .environment(profile)
+                .environment(session)
+                /* 카카오톡에서 되돌아오는 URL. `RootView`가 아니라 여기에 두는 이유는
+                 * 로그인 화면(게이트의 다른 분기)에서도 받아야 하기 때문이다. */
+                .onOpenURL { url in _ = KakaoLogin.handle(url) }
         }
     }
 }

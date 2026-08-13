@@ -104,7 +104,7 @@ struct TokensResponse: Decodable, Sendable {
 
 // MARK: - 사용자
 
-struct UserProfile: Decodable, Sendable {
+struct UserProfile: Decodable, Sendable, Equatable {
     let id: UUID
     /// 온보딩 전에는 null이다.
     let nickname: String?
