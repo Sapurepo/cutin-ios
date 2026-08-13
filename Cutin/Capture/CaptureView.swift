@@ -130,7 +130,10 @@ struct CaptureView: View {
     }
 
     /* 촬영 실패를 조용히 넘기면 사용자는 셔터가 고장 난 줄 안다 — 이전 구현은 `try?`로 삼켰다.
-     * 문구를 배너 컴포넌트로 통일하는 일은 편집 3단계 브랜치에서 한다. */
+     *
+     * 마무리 화면의 저장 실패 문구와 공용 배너로 묶는 것은 검토했다가 접었다 — 이쪽은 뷰파인더
+     * 위에 얹는 캡슐(강제 다크)이고 그쪽은 폼 안의 캡션 줄(테마 팔레트)이라, 하나로 묶으면
+     * 스타일 변형 파라미터가 붙는다. 네트워크 문구가 들어오는 0.2.0에 다시 볼 지점이다. */
     private func failureLabel(_ error: CameraController.CaptureError) -> some View {
         Text(message(for: error))
             .font(Typography.chip)
