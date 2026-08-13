@@ -7,9 +7,13 @@
 import Observation
 
 /// 촬영 시트 내부의 단계. 시트 밖 탭 화면의 라우팅과 섞이지 않게 분리해 둔다.
+/// 루트(컷 수·방식 선택)는 값이 없다 — 경로가 빈 상태가 곧 루트다.
 enum CaptureStep: Hashable {
     case camera
-    case compose
+    /// 편집 3단계 — 명세 §6.1 / §6.2 / §6.4
+    case template
+    case filter
+    case finish
 }
 
 @MainActor

@@ -11,6 +11,15 @@ extension View {
     func primaryGlassButton(tint: Color) -> some View {
         buttonStyle(.glassProminent).tint(tint)
     }
+
+    /// 화면 폭을 채우는 CTA의 **라벨**에 붙인다 — 폰트·폭·높이가 화면마다 달라지면
+    /// 편집 단계를 넘길 때 같은 자리의 버튼이 미묘하게 튄다.
+    /// (`primaryGlassButton`은 스타일이라 라벨 치수를 정하지 못한다.)
+    func primaryGlassLabel() -> some View {
+        font(Typography.buttonLabel)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.x4)
+    }
 }
 
 #Preview("PrimaryGlassButton", traits: .sizeThatFitsLayout) {

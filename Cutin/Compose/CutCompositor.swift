@@ -22,6 +22,9 @@ enum CutCompositor {
     /// 스킨 값(padding 12 / gutter 8 …)이 설계된 기준 폭. 출력 폭에 맞춰 비례 확대한다.
     private static let designWidth: CGFloat = 360
 
+    /// 파일로 남기는 합성 폭. 화면용은 이보다 작게 굽는다(`ComposePreview`).
+    static let saveWidth: CGFloat = 1080
+
     static func render(_ request: CompositionRequest) -> UIImage {
         let skin = request.skin
         let scale = request.outputWidth / designWidth

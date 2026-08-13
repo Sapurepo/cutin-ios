@@ -102,10 +102,18 @@ struct RootView: View {
         switch step {
         case .camera:
             CaptureView(flow: flow) {
-                coordinator.advanceCapture(to: .compose)
+                coordinator.advanceCapture(to: .template)
             }
-        case .compose:
-            ComposeView(cuts: flow.cuts, count: flow.count) {
+        case .template:
+            TemplateStepView(flow: flow) {
+                coordinator.advanceCapture(to: .filter)
+            }
+        case .filter:
+            FilterStepView(flow: flow) {
+                coordinator.advanceCapture(to: .finish)
+            }
+        case .finish:
+            FinishStepView(flow: flow) {
                 flow.reset()
                 coordinator.finishCapture()
             }
