@@ -499,6 +499,10 @@ struct RegisterDeviceBody: Encodable, Sendable {
     let platform: String
     /// APNs 디바이스 토큰(16진 문자열).
     let pushToken: String
+    /* 토큰이 어느 APNs 엔드포인트에 유효한지 — `sandbox` 또는 `production`. **필수다**(없으면
+     * 400). 서버가 추측하지 않는 이유: sandbox 토큰을 production으로 보내면 `BadDeviceToken`
+     * 인데, 어느 환경인지는 빌드를 만든 쪽만 안다. 판정은 `PushRegistrar.pushEnvironment`. */
+    let pushEnvironment: String
     let timezone: String
 }
 
@@ -509,6 +513,8 @@ struct RevokeDeviceBody: Encodable, Sendable {
 struct Device: Decodable, Sendable {
     let id: UUID
     let platform: String
+    /// 서버가 어느 환경으로 기록했는지 그대로 돌려준다.
+    let pushEnvironment: String
     let timezone: String
 }
 

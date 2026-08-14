@@ -5,15 +5,18 @@
 
 ## ⚠️ 아직 알림이 오지 않습니다
 
-계약은 다 붙였지만 **양쪽에 남은 일이 있습니다.**
+서버는 준비됐습니다 — APNs 발송 구현(`shared/push/apnsPushService.ts`)이 있고 자격증명
+4종(env)을 채우면 실제로 보냅니다. 남은 것은 **앱의 Push Notifications 자격(entitlement)**
+입니다. 추가하려면 pbxproj를 만져야 하는데, 릴리즈당 한 브랜치만 pbxproj를 건드린다는
+규칙이 있어 릴리즈 준비 브랜치의 몫입니다. 자격이 없으면 `registerForRemoteNotifications()`가
+토큰 대신 오류를 줍니다(`AppDelegate`가 그 오류를 로그로 남깁니다).
 
-1. **앱** — Push Notifications 자격(entitlement)이 없습니다. 추가하려면 pbxproj를 만져야 하는데,
-   릴리즈당 한 브랜치만 pbxproj를 건드린다는 규칙이 있어 릴리즈 준비 브랜치의 몫입니다.
-   자격이 없으면 `registerForRemoteNotifications()`가 토큰 대신 오류를 줍니다
-   (`AppDelegate`가 그 오류를 로그로 남깁니다).
-2. **서버** — `PushService`가 인터페이스뿐이고 APNs 구현이 없습니다.
-   `shared/push/pushService.ts` 머리말에 "APNs가 확정되기 전까지 인터페이스로만 다룬다"고
-   적혀 있습니다.
+서버 구현과 함께 `POST /devices` 계약이 바뀌었습니다 — `pushEnvironment`(`sandbox` /
+`production`)가 **필수**입니다(없으면 400). 토큰은 한 APNs 환경에서만 유효해서
+(sandbox 토큰을 production으로 보내면 `BadDeviceToken`), 빌드를 만든 쪽만 아는 값을
+클라이언트가 알려줍니다. 판정은 `PushRegistrar.pushEnvironment` — 프로비저닝 프로파일의
+`aps-environment`가 `development`면 sandbox, 그 외·프로파일 없음(App Store)은 production,
+시뮬레이터는 sandbox입니다.
 
 그래서 이 하니스는 **토큰이 생겼을 때 서버에 제대로 들어가는지**까지만 봅니다.
 
@@ -37,7 +40,7 @@
 | ② | 읽음 | 본 것이 없으면 왕복 안 함 · **본 것만** 보냄 · 읽은 것은 다시 안 보냄 |
 | ③ | **100개 상한** | 250개를 세 번에 나눠 보내는지 · 한 호출 최대가 100 이하인지 |
 | ④ | 설정 | 기본값 · **빈 슬롯은 보내지 않음** · 끄기는 `pushEnabled`로 |
-| ⑤ | 디바이스 | **토큰을 16진으로** · 플랫폼·타임존 · 해제 후 다시 안 보냄 |
+| ⑤ | 디바이스 | **토큰을 16진으로** · 플랫폼·**환경(sandbox)**·타임존 · 해제 후 다시 안 보냄 |
 | ⑥ | 계정 전환 | `reset()`이 목록·배지·`pendingRead`를 비움 · **뒤늦은 응답을 버림** · 이후 로드가 막히지 않음 |
 
 ⑤의 첫 항목: `Data`를 그대로 문자열로 만들면 `4 bytes` 같은 설명이 됩니다. APNs 토큰은
@@ -97,15 +100,24 @@ FAIL  이후 요청은 정상으로 채워진다
 === 결과: 실패 2건 ===
 ```
 
+⑤의 음성 대조군은 `submit(token:)`이 잘못된 환경 값을 보내게 하는 것입니다
+(`pushEnvironment: "dev"`). 스텁이 서버처럼 400을 내고 등록이 거절됩니다.
+
+```
+FAIL  환경을 실었다 — 시뮬레이터는 sandbox
+=== 결과: 실패 1건 ===
+```
+
 ## 결과 (2026-08-14 · iPhone 17 Pro · iOS 26.5)
 
-- 정상: **36 PASS / 0 FAIL**
+- 정상: **37 PASS / 0 FAIL**
 - 음성 대조군(읽음 분할 제거): **실패 3건** (2026-08-13 기록)
-- 음성 대조군(세대 검사 제거): **실패 2건**
+- 음성 대조군(세대 검사 제거): **실패 2건** (2026-08-14 기록)
+- 음성 대조군(잘못된 pushEnvironment): **실패 1건**
 
 ## 이 하니스가 보지 않는 것
 
-- **실제 푸시** — 위의 두 가지가 남아 있습니다.
+- **실제 푸시** — 앱 자격(entitlement)과 서버의 APNs 자격증명 4종이 남아 있습니다.
 - **권한 대화상자** — `UNUserNotificationCenter`가 사람에게 묻습니다.
 - **화면** — 피드 툴바의 종과 점 배지, 알림 목록의 읽음 표시, 설정 토글.
 - **`GET /health`** — 운영용 프로브라 앱에서 부를 자리가 없습니다. 계약 타입만 두었습니다.

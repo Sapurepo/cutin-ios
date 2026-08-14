@@ -201,7 +201,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not token:
                     self._error(400, "VALIDATION_FAILED", "pushToken이 필요합니다.")
                     return
+                # 필수다 — 안 보내면 조용히 production으로 잘못 등록되므로 서버가 400을 낸다.
+                environment = body.get("pushEnvironment")
+                if environment not in ("sandbox", "production"):
+                    self._error(400, "VALIDATION_FAILED",
+                                "pushEnvironment는 sandbox 또는 production이어야 합니다.")
+                    return
                 device = {"id": str(uuid.uuid4()), "platform": body.get("platform"),
+                          "pushEnvironment": environment,
                           "timezone": body.get("timezone")}
                 devices[token] = device
             self._send(201, device)

@@ -139,8 +139,12 @@ Release 구성이 첫 호출에서 멈추고(서버 미배포), 대표 컷은 �
 | 조각 | 위치 | 상태 |
 |---|---|---|
 | Push Notifications 자격 | 앱 pbxproj — **릴리즈 준비 브랜치의 몫**(릴리즈당 한 브랜치만 pbxproj를 건드린다) | 미착수 |
-| `PushService` APNs 구현 | 서버 — 인터페이스·발송 잡·무효 토큰 폐기까지 있고 실물만 없다 | 미착수. **Apple Developer 계정과 APNs 키가 선행** |
+| `PushService` APNs 구현 | 서버 — HTTP/2 어댑터(`apnsPushService`)가 붙었다. 자격증명 4종 env를 채우면 실발송 | **구현됨.** 운영 투입은 APNs 키(Apple Developer 계정)가 선행 |
 | 서버 배포 | 백엔드 — CI만 있고 배포 설정이 없다. 스토리지도 로컬 디스크(`localDiskStorage`) | **인프라 결정이 선행**(호스팅·스토리지 벤더). 배포되면 `Release.xcconfig` 한 줄 |
+
+서버 APNs 구현과 함께 `POST /devices` 계약이 바뀌었다 — `pushEnvironment`(`sandbox`/
+`production`)가 **필수**다. 앱은 프로비저닝 프로파일의 `aps-environment`로 판정해 싣는다
+(`PushRegistrar.pushEnvironment`). 검증은 `Scripts/notifications/`.
 
 #### 범위 밖 (0.3.0에서도)
 
