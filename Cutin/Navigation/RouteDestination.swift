@@ -20,6 +20,8 @@ extension View {
                 NotificationsView()
             case .notificationSettings:
                 NotificationSettingsView()
+            case .tips:
+                TipsView(onStart: nil)
             }
         }
     }
