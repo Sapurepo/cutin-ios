@@ -29,6 +29,7 @@ enum NotificationsHarness {
         await scenarioReadBatching()
         await scenarioPreferences()
         await scenarioDevice()
+        await scenarioAccountSwitch()
 
         TokenStore().clear()
         print("=== 결과: \(failures == 0 ? "전부 통과" : "실패 \(failures)건") ===")
@@ -169,6 +170,47 @@ enum NotificationsHarness {
         await push.revoke()
         check("토큰이 없으면 다시 보내지 않는다",
               (await state())["deviceRevokeCount"] as? Int == 1)
+    }
+
+    // MARK: - ⑥ 계정 전환 — reset이 비우고, 날아가 있던 요청이 되살리지 않는다
+
+    /* 알림은 전부 받는 사람 기준이다. 비우지 않으면 다음 계정이 이전 계정의 목록·배지를 보고,
+     * `pendingRead`가 남으면 **다음 계정의 토큰으로 남의 알림을 읽음 처리**하러 간다.
+     * (`Scripts/followups`가 PostStore·SocialStore에서 잡은 것과 같은 결함의 알림판이다.) */
+    private static func scenarioAccountSwitch() async {
+        print("=== ⑥ 계정 전환 — reset ===")
+        await reset(["seedNotifications": 6, "seedUnread": 5])
+        let store = await context()
+
+        await store.load()
+        await store.loadUnreadCount()
+        store.items.forEach { store.markVisible($0.id) }
+        check("전환 전 목록이 있다", !store.items.isEmpty)
+        check("전환 전 배지가 있다", store.unread == 5)
+
+        store.reset()
+        check("목록·커서·배지가 비었다",
+              store.items.isEmpty && store.nextCursor == nil
+                  && !store.hasLoaded && store.unread == 0)
+
+        // 모아 둔 읽음 후보도 버려야 한다 — flushRead가 왕복을 만들면 안 된다.
+        let before = (await state())["readCount"] as? Int ?? -1
+        await store.flushRead()
+        check("이전 계정의 읽음 후보를 보내지 않는다",
+              (await state())["readCount"] as? Int == before)
+
+        // 로드 중 전환: 응답이 늦게 도착해도 비운 자리를 되살리지 않는다.
+        await reset(["seedNotifications": 6, "seedUnread": 5, "delay": 0.3])
+        let racing = await context()
+        async let inflight: Void = racing.load()
+        try? await Task.sleep(for: .milliseconds(50))
+        racing.reset()
+        _ = await inflight
+        check("뒤늦은 응답을 버린다", racing.items.isEmpty && !racing.hasLoaded)
+
+        await reset(["delay": 0.0, "seedNotifications": 2, "seedUnread": 1])
+        await racing.load()
+        check("이후 요청은 정상으로 채워진다", racing.items.count == 2)
     }
 
     // MARK: - 보조

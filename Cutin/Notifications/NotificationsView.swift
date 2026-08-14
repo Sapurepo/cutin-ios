@@ -14,19 +14,29 @@ struct NotificationsView: View {
 
     var body: some View {
         Group {
-            if store.items.isEmpty {
-                if store.isLoading || !store.hasLoaded {
-                    ProgressView().tint(palette.textSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    EmptyStateView(
-                        title: "새 소식이 없어요",
-                        message: "친구가 반응하거나 댓글을 남기면 여기 모여요",
-                        systemImage: "bell"
-                    )
-                }
-            } else {
+            if !store.items.isEmpty {
                 list
+            } else if store.isLoading {
+                ProgressView().tint(palette.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let failure = store.failure {
+                /* 실패와 빈 목록을 가른다(`PostList`와 같은 판단). 실패에서 `hasLoaded`가 false로
+                 * 남는데, 이전 판은 그 상태를 "로딩 중"으로 그려서 **스피너가 영원히 돌았다** —
+                 * 재시도할 길도 없었다. */
+                EmptyStateView(title: "불러오지 못했어요", message: failure,
+                               systemImage: "exclamationmark.triangle") {
+                    Button("다시 시도") { Task { await store.load(refresh: true) } }
+                        .primaryGlassButton(tint: palette.accent)
+                }
+            } else if !store.hasLoaded {
+                ProgressView().tint(palette.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                EmptyStateView(
+                    title: "새 소식이 없어요",
+                    message: "친구가 반응하거나 댓글을 남기면 여기 모여요",
+                    systemImage: "bell"
+                )
             }
         }
         .background(palette.bg)

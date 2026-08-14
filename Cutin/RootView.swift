@@ -17,6 +17,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(CaptureFlow.self) private var flow
     @Environment(TemplateCatalog.self) private var catalog
+    @Environment(PushRegistrar.self) private var push
 
     @State private var coordinator = AppCoordinator()
     @State private var pendingIntent: CaptureIntent?
@@ -59,6 +60,10 @@ struct RootView: View {
          * 이어쓰기 경로는 설정 화면을 건너뛰므로 여기서 받아 두지 않으면 편집 1단계의
          * 배치·프레임 칩이 빈 줄로 뜬다. */
         .task { await catalog.loadIfNeeded() }
+        /* 이미 알림을 허용한 사용자의 APNs 등록. 토큰은 재설치·복원에서 바뀌므로 로그인한
+         * 셸이 뜰 때마다 다시 등록한다 — `PushRegistrar.registerIfAuthorized`가 이 호출
+         * 하나로 배선된다(권한이 없으면 아무 일도 하지 않는다). */
+        .task { await push.registerIfAuthorized() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 /* 만료는 읽는 시점 판정이지만(§5.3) 이 객체는 앱 수명이라 시작 시 한 번만으로는

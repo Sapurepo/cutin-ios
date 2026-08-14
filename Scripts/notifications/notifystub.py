@@ -9,7 +9,7 @@
 
 미읽음 수를 목록과 **따로** 관리한다. 앱이 목록에서 세는 실수를 하면 값이 갈리도록.
 """
-import json, sys, threading, uuid
+import json, sys, threading, time, uuid
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -23,6 +23,7 @@ devices = {}           # pushToken -> device
 prefs = {"slots": ["morning"], "pushEnabled": True}
 
 state = {
+    "delay": 0.0,          # GET /notifications 응답 지연(초). 로드 중 계정 전환 검사가 쓴다
     "readCount": 0, "readIdCount": 0, "maxIdsInOneCall": 0,
     "deviceRegisterCount": 0, "deviceRevokeCount": 0,
     "prefsPutCount": 0, "lastPrefs": None, "lastDevice": None,
@@ -90,6 +91,11 @@ class Handler(BaseHTTPRequestHandler):
         cursor = (parse_qs(parsed.query).get("cursor") or [None])[0]
 
         with lock:
+            delay = state["delay"]
+        if parsed.path == "/notifications" and delay:
+            time.sleep(delay)   # 락 밖에서 잔다 — 안에서 자면 동시 요청이 직렬화된다
+
+        with lock:
             if parsed.path == "/notifications":
                 ordered = list(reversed(notifications))   # 최신 → 오래된
                 start = 0
@@ -143,6 +149,7 @@ class Handler(BaseHTTPRequestHandler):
                 notifications.clear(); devices.clear()
                 prefs.update({"slots": ["morning"], "pushEnabled": True})
                 state.update({
+                    "delay": 0.0,
                     "readCount": 0, "readIdCount": 0, "maxIdsInOneCall": 0,
                     "deviceRegisterCount": 0, "deviceRevokeCount": 0,
                     "prefsPutCount": 0, "lastPrefs": None, "lastDevice": None,

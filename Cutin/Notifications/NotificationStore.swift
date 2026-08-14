@@ -43,9 +43,12 @@ final class NotificationStore {
         if !refresh, hasLoaded, nextCursor == nil { return }
 
         let cursor = refresh ? nil : nextCursor
+        let generation = generation
         isLoading = true
         failure = nil
-        defer { isLoading = false }
+        defer {
+            if generation == self.generation { isLoading = false }
+        }
 
         do {
             let page = try await client.send(
@@ -53,6 +56,8 @@ final class NotificationStore {
                 query: cursor.map { ["cursor": $0] } ?? [:],
                 as: NotificationPage.self
             )
+            // 기다리는 사이 계정이 바뀌었으면 이전 계정의 알림이다(`reset()` 참고).
+            guard generation == self.generation else { return }
             if refresh {
                 items = page.items
             } else {
@@ -62,18 +67,42 @@ final class NotificationStore {
             nextCursor = page.nextCursor
             hasLoaded = true
         } catch {
+            guard generation == self.generation else { return }
             failure = message(for: error)
         }
     }
 
     func loadUnreadCount() async {
+        let generation = generation
         // 실패는 삼킨다 — 배지가 잠깐 옛 값이어도 화면이 망가지지 않는다.
         if let result = try? await client.send(
             .get, "/notifications/unread-count", as: UnreadCount.self
-        ) {
+        ), generation == self.generation {
             unread = result.count
         }
     }
+
+    /* 계정이 바뀌었다. 알림은 전부 받는 사람 기준이라 한 줄도 남길 수 없다 — 목록·배지가
+     * 이전 계정 것으로 남고, `pendingRead`가 남으면 **다음 계정의 토큰으로 남의 알림을
+     * 읽음 처리**하러 간다. 세대 검사는 `PostStore.reset()`과 같은 이유다. */
+    func reset() {
+        generation += 1
+        items = []
+        nextCursor = nil
+        /* `isLoading`도 내린다. 날아가 있던 요청의 `defer`는 세대가 지나 건드리지 못하므로
+         * 여기서 내리지 않으면 **다음 로드가 영영 `guard !isLoading`에 막힌다** —
+         * 하니스 ⑥ "이후 요청은 정상으로 채워진다"가 처음에 이걸로 실패했다.
+         * (`PostStore`는 `List()` 통째 교체라 이 문제가 없다.) */
+        isLoading = false
+        hasLoaded = false
+        failure = nil
+        unread = 0
+        preferences = nil
+        pendingRead = []
+    }
+
+    /// 계정 세대. 날아가 있던 요청이 비운 자리를 되살리지 않도록 한다.
+    @ObservationIgnored private var generation = 0
 
     // MARK: - 읽음
 
@@ -89,6 +118,7 @@ final class NotificationStore {
      * 보내지 못한 것까지 읽음으로 그리면 다음에 열었을 때 다시 안 읽음으로 돌아가기 때문이다. */
     func flushRead() async {
         guard !pendingRead.isEmpty else { return }
+        let generation = generation
         let batches = Array(pendingRead).chunked(into: 100)
         pendingRead = []
 
@@ -96,11 +126,14 @@ final class NotificationStore {
             do {
                 try await client.send(.post, "/notifications/read",
                                       body: MarkReadBody(ids: batch))
+                // 보내는 사이 계정이 바뀌었으면 남은 묶음도, 반영도 이전 계정의 것이다.
+                guard generation == self.generation else { return }
                 let stamp = ISO8601DateFormatter().string(from: Date())
                 items = items.map { $0.readAt == nil && batch.contains($0.id)
                     ? $0.markingRead(at: stamp) : $0 }
                 unread = max(0, unread - batch.count)
             } catch {
+                guard generation == self.generation else { return }
                 // 못 보낸 것은 다시 모아 둔다 — 다음 기회에 보낸다.
                 pendingRead.formUnion(batch)
             }
@@ -110,9 +143,12 @@ final class NotificationStore {
     // MARK: - 설정 (§3.3)
 
     func loadPreferences() async {
-        preferences = try? await client.send(
+        let generation = generation
+        if let loaded = try? await client.send(
             .get, "/users/me/notification-preferences", as: NotificationPreferences.self
-        )
+        ), generation == self.generation {
+            preferences = loaded
+        }
     }
 
     /* 슬롯은 **하나 이상**이어야 한다(서버 `minItems: 1`). 마지막 슬롯을 끄려는 시도는 보내지
