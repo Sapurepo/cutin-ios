@@ -22,6 +22,8 @@ struct UserProfileView: View {
 
     @State private var isConfirmingBlock = false
     @State private var isReporting = false
+    /// 팔로우·차단 실패. 관계는 눌러도 화면이 잠깐 그대로라, 문구가 없으면 버튼이 죽은 줄 안다.
+    @State private var notice: String?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -51,7 +53,7 @@ struct UserProfileView: View {
                     Button(social.profile(id: id)?.blocking == true ? "차단 해제" : "차단하기",
                            role: .destructive) {
                         if social.profile(id: id)?.blocking == true {
-                            Task { await social.toggleBlock(id: id) }
+                            Task { await toggleBlock() }
                         } else {
                             isConfirmingBlock = true
                         }
@@ -63,7 +65,7 @@ struct UserProfileView: View {
         }
         .confirmationDialog("이 사람을 차단할까요?", isPresented: $isConfirmingBlock,
                             titleVisibility: .visible) {
-            Button("차단하기", role: .destructive) { Task { await social.toggleBlock(id: id) } }
+            Button("차단하기", role: .destructive) { Task { await toggleBlock() } }
             Button("취소", role: .cancel) {}
         } message: {
             Text("서로의 팔로우가 끊기고, 차단을 풀어도 되돌아오지 않아요")
@@ -92,6 +94,13 @@ struct UserProfileView: View {
                 .foregroundStyle(palette.textSecondary)
 
             if !profile.blocking { followButton(profile) }
+
+            if let notice {
+                Text(notice)
+                    .font(Typography.caption)
+                    .foregroundStyle(palette.danger)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -99,7 +108,7 @@ struct UserProfileView: View {
      * 팔로우 중이면 누르는 순간 친구가 된다 — 그 결과를 미리 알려주는 편이 정직하다. */
     private func followButton(_ profile: PublicProfile) -> some View {
         Button {
-            Task { await social.toggleFollow(id: id) }
+            Task { await toggleFollow() }
         } label: {
             Text(label(for: profile)).primaryGlassLabel()
         }
@@ -111,6 +120,26 @@ struct UserProfileView: View {
         if profile.friend { return "친구" }
         if profile.following { return "팔로잉" }
         return profile.followedBy ? "맞팔로우" : "팔로우"
+    }
+
+    // MARK: - 관계 바꾸기
+
+    private func toggleFollow() async {
+        notice = nil
+        do {
+            try await social.toggleFollow(id: id)
+        } catch {
+            notice = error.displayMessage(fallback: "관계를 바꾸지 못했어요")
+        }
+    }
+
+    private func toggleBlock() async {
+        notice = nil
+        do {
+            try await social.toggleBlock(id: id)
+        } catch {
+            notice = error.displayMessage(fallback: "차단을 바꾸지 못했어요")
+        }
     }
 
     private var blockedNotice: some View {

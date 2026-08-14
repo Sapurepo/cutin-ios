@@ -129,7 +129,7 @@ struct PostDetailView: View {
                 let count = post.reactions.counts.first { $0.type.known == type }?.count ?? 0
                 let mine = post.reactions.mine?.known == type
                 Button {
-                    Task { await store.react(id: post.id, type: type) }
+                    Task { await react(post, type) }
                 } label: {
                     HStack(spacing: 2) {
                         Text(type.emoji)
@@ -189,7 +189,7 @@ struct PostDetailView: View {
             .disabled(isSavingToPhotos || post.composed == nil)
 
             Button {
-                Task { await store.toggleBookmark(id: post.id) }
+                Task { await toggleBookmark(post) }
             } label: {
                 actionLabel(post.bookmarked ? "보관 해제" : "보관",
                             systemImage: post.bookmarked ? "bookmark.fill" : "bookmark")
@@ -216,6 +216,26 @@ struct PostDetailView: View {
     }
 
     // MARK: - 동작
+
+    /* 보관·반응은 **누르면 끝나는** 동작이라 실패해도 화면이 달라지지 않는다. 그래서 문구를
+     * 띄우지 않으면 사용자는 버튼이 죽은 줄 안다 — 공유·삭제와 같은 자리(`notice`)에 쓴다. */
+    private func toggleBookmark(_ post: Post) async {
+        notice = nil
+        do {
+            try await store.toggleBookmark(id: post.id)
+        } catch {
+            notice = error.displayMessage(fallback: "보관을 바꾸지 못했어요")
+        }
+    }
+
+    private func react(_ post: Post, _ type: ReactionType) async {
+        notice = nil
+        do {
+            try await store.react(id: post.id, type: type)
+        } catch {
+            notice = error.displayMessage(fallback: "반응을 남기지 못했어요")
+        }
+    }
 
     private func delete(_ post: Post) {
         Task {

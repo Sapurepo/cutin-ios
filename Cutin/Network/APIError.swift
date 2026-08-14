@@ -77,6 +77,31 @@ enum APIError: Error {
     }
 }
 
+extension Error {
+    /* 화면에 그대로 쓸 문구.
+     *
+     * **서버가 준 한국어 `message`를 우선한다** — 거절 이유(중복 신고·비공개 포스트·차단된
+     * 상대)를 앱이 다시 쓰면 서버가 조건을 바꿔도 화면은 옛 문장을 말한다. 앱이 문구를 갖는
+     * 경우는 서버에 닿지 못했을 때뿐이다. 그때는 서버 문장이 존재하지 않는다.
+     *
+     * `fallback`은 **무엇이 실패했는지** 말해야 한다("보관하지 못했어요"). 서버가 응답을 주지
+     * 못한 상황이라 그 답을 아는 것은 부른 쪽뿐이다.
+     *
+     * 스토어들이 각자 들고 있는 `message(for:)`와 같은 판단이다. 그쪽을 이 함수로 모으는 것은
+     * 이 브랜치의 일이 아니다 — 여기서는 새로 생긴 호출부만 쓴다. */
+    func displayMessage(fallback: String) -> String {
+        guard let api = self as? APIError else { return fallback }
+        switch api {
+        case .transport:
+            return "서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요"
+        case .server(_, _, let message, _):
+            return message
+        case .malformedResponse, .decoding:
+            return fallback
+        }
+    }
+}
+
 /// 오류 봉투. 디코드 자체가 실패하면 `malformedResponse`로 떨어진다.
 struct APIErrorEnvelope: Decodable {
     struct Payload: Decodable {
