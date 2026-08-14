@@ -29,6 +29,12 @@ struct AuthGate: View {
         case .signedOut:
             LoginView()
                 .environment(\.palette, Palette.of(colorScheme))
+        /* 온보딩을 탭 셸 **안**이 아니라 여기서 가른다. 셸 안에 시트로 띄우면 그 뒤에 피드가
+         * 이미 떠 있고, 온보딩을 마치지 않은 계정은 닉네임이 없어 포스트에 이름을 붙일 수 없다.
+         * 서버도 같은 판단이다 — `onboardingCompleted`를 프로필에 실어 준다. */
+        case .signedIn(let profile) where !profile.onboardingCompleted:
+            OnboardingView(saved: profile.nickname)
+                .environment(\.palette, Palette.of(colorScheme))
         case .signedIn:
             RootView()
         }
