@@ -81,21 +81,35 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 | 레이아웃 4종(2×2·세로4·가로4·빅레프트) | `grid4` 2×2 하나뿐 | **서버에 3종 추가 요청** ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) A) |
 | 2컷 **가로 배치** | `strip2` **세로 스택** | 서버를 따른다. 의도 확인 요청 ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) A-4) |
 | 캔버스 항상 정사각 | 컷 수마다 다른 `aspectRatio` | 서버를 따른다. 다만 프레임 여백 포함 여부 정의 요청 ([#11](https://github.com/Sapurepo/cutin-backend/issues/11) C) |
-| §6.3 대표 컷 미구현 | `thumbnailCutIndex` 필드 존재 | 구현한다 |
-| 공개 범위 UI 없음 | `visibility` 필수 열거형 | 구현한다 |
-| draft를 로컬 파일로 | 서버 draft(`GET /posts/draft`) | 서버가 진실. 로컬 draft는 오프라인 버퍼로 격하 |
-| `posts.json` 로컬 인덱스 | `GET /feed` 커서 | 서버가 진실 |
+| §6.3 대표 컷 미구현 | `thumbnailCutIndex` 필드 존재 | **여전히 미구현** — 아래 참고 |
+| 공개 범위 UI 없음 | `visibility` 필수 열거형 | 구현했다(편집 3단계) |
+| draft를 로컬 파일로 | 서버 draft(`GET /posts/draft`) | 발행 파이프라인은 서버 draft를 쓴다. 로컬 draft는 **진행 중인 촬영**으로 남는다 — 그건 이 기기의 상태다 |
+| `posts.json` 로컬 인덱스 | `GET /feed` 커서 | 서버가 진실. 로컬 인덱스·JPEG 저장 계층을 걷어냈다 |
 | 인증 없음(바로 피드) | 모든 엔드포인트 Bearer | **로그인 + 온보딩(닉네임)까지 넣는다.** 카카오만 — 구글은 도입 취소 |
 | 기존 로컬 포스트 | — | **버린다.** 0.1.0은 실기기 검증도 안 된 개발 빌드였다 |
-| `archive.json` 보관 | **서버 API 없음** | 로컬 유지. [cutin-backend#10](https://github.com/Sapurepo/cutin-backend/issues/10)으로 API 요청 |
+| `archive.json` 보관 | 착수 시점에는 API 없음 | **서버로 옮겼다** — `GET /users/me/bookmarks`가 생겼다([cutin-backend#10](https://github.com/Sapurepo/cutin-backend/issues/10)) |
 
-#### 범위 밖 (0.2.0에서도)
+> 위 표는 0.2.0 **착수 시점**의 판단입니다. 마지막 두 줄과 아래 "범위 밖"은 진행 중에
+> 뒤집혔습니다 — 문서가 실제와 다른 말을 하지 않도록 결과로 고쳐 적었습니다.
 
-반응·댓글·알림·푸시·팔로우는 API가 있지만 0.2.0에서 다루지 않습니다 — 인증·업로드·포스트
-수명주기·피드가 먼저 서야 그 위에 얹을 수 있습니다.
+#### 착수 시점에 범위 밖이라고 적었으나 들어간 것
 
-**구글 로그인도 범위 밖입니다.** 서버는 `google`·`kakao` 둘을 지원하지만(전자는 `id_token`을
-JWKS로 검증, 후자는 `access_token`을 kapi Bearer로 사용) 0.2.0은 카카오만 붙입니다.
+반응·댓글·팔로우·차단·신고를 **넣었습니다.** 인증·업로드·포스트 수명주기·피드가 서고 나니
+그 위에 얹는 것이 남은 일이었고, 서버 API가 이미 있었습니다.
+
+#### 범위 밖 (0.2.0 최종)
+
+- **알림·푸시.** 서버가 온보딩 완료 시점에 기본 슬롯을 채우지만 발송 인프라가 미정입니다.
+  고르게 해도 알림이 가지 않으므로 화면을 만들지 않았습니다.
+- **§6.3 대표 컷 지정.** 서버에 `thumbnailCutIndex`가 있고 발행 요청에 실을 수도 있지만
+  **읽는 화면이 없습니다** — 피드·상세·프로필 그리드가 모두 합성 결과를 보여줍니다.
+  0.1.0에서 넣지 않은 이유가 그대로 남아 있어 결국 넣지 않았습니다.
+- **온보딩 §3.2 친구목록·§3.3 알림 슬롯·§3.5 팁 화면.** 각각 연락처 매칭 경로 없음 · 푸시
+  미정 · 보여줄 팁 미정입니다. 지키지 못할 약속을 화면에 만들지 않았습니다.
+- **오프라인 피드.** 서버 목록의 파일 캐시를 두지 않았습니다 — 사본을 두면 "서버에서 지운
+  포스트가 기기에 남는다"를 새로 얻습니다.
+- **구글 로그인.** 서버는 `google`·`kakao` 둘을 지원하지만(전자는 `id_token`을 JWKS로 검증,
+  후자는 `access_token`을 kapi Bearer로 사용) 0.2.0은 카카오만 붙입니다.
 
 ## 관련 저장소
 
@@ -135,8 +149,10 @@ open Cutin.xcodeproj
 
 ```
 Cutin/
-  CutinApp.swift        @main — 앱 진입점. 앱 수명 상태(FeedStore·CaptureFlow·
-                        ArchiveStore·ProfileStore)를 만들어 환경으로 내린다
+  CutinApp.swift        @main — 앱 진입점. 전송 계층 하나와 그것을 쓰는 앱 수명 상태
+                        (AuthSession·PostStore·SocialStore·CommentStore·TemplateCatalog·
+                        PostPublisher·CaptureFlow)를 만들어 환경으로 내린다.
+                        계정이 바뀌면 서버에서 받아 둔 것을 버린다
   RootView.swift        탭 셸 (네이티브 Liquid Glass) · 촬영 커버 · draft 차단 시트
   AppIcon.icon/         Icon Composer 레이어 문서 (iOS 26 Liquid Glass 아이콘)
   Auth/                 로그인 게이트 · 카카오 로그인 · 세션 · 토큰 보관(Keychain)
@@ -146,28 +162,36 @@ Cutin/
                         + Components/ (2곳 이상에서 실제로 쓰이는 것만)
   Domain/               도메인 모델 (packages/types 에서 이식)
   Capture/              AVFoundation 커스텀 카메라 · 촬영 플로우 상태 · draft 차단 시트
-  Compose/              Core Image 필터 · 템플릿 레지스트리 · N컷 합성(베이킹) ·
-                        편집 3단계 화면 · 공유 미리보기
-  Storage/              파일 접근 규칙(FileVault) · 포스트 JPEG/인덱스 · 이미지 캐시 ·
-                        draft 영속 · 보관(archive.json)
-  Feed/                 피드 · 포스트 카드 · 상세 · 저장 정책
-  Archive/ Friends/ Profile/   나머지 탭
+  Compose/              Core Image 필터 · 서버 템플릿/프레임 목록 · 배치 계산 ·
+                        N컷 합성(베이킹) · 편집 3단계 화면 · 발행 파이프라인
+  Storage/              파일 접근 규칙(FileVault) · 컷 JPEG 쓰기/디코드 · draft 영속
+                        (로컬에 남는 것은 **진행 중인 촬영**뿐이다)
+  Feed/                 피드 · 포스트 카드 · 상세 · 서버 포스트 상태 · 댓글
+  Friends/              친구·팔로우·차단(SocialStore) · 타인 프로필 · 신고
+  Archive/ Profile/     나머지 탭
   Resources/Fonts/      Pretendard(한글) · Geist(라틴 전용)
 Config/
   Shared.xcconfig       두 구성 공통 빌드 설정 (SWIFT_VERSION · 카카오 앱 키 포함)
   Debug/Release.xcconfig  구성별 설정 — 지금은 Shared를 include만 한다
-  Info.plist            카메라·사진 앱 권한 문구 + UIAppFonts
+  Info.plist            카메라·사진 앱 권한 문구 · UIAppFonts · API 기준 주소 ·
+                        카카오 URL 스킴
 ```
 
 ```
 Scripts/
   contract/             서버 계약 검증 (openapi.json 스냅샷 · 픽스처 생성기 · 바디 대조기)
-  auth/                 인증 흐름 검증 (스텁 서버 · 하니스)
+  auth/                 인증 흐름 검증 — 401 재발급 · 동시 401 · Keychain
+  geometry/             배치·합성 검증 — 슬롯 → 좌표 · 캔버스 크기 · 컷 순서(픽셀을 읽는다)
+  onboarding/           닉네임 확인·저장 검증 — 서버 거절과 재시도 경로
+  media/                업로드 왕복 셋 검증
+  posts/                발행 파이프라인 · 원격 피드 · 보관 검증
+  social/               친구·댓글·반응·신고 검증
+  followups/            후속 수정 3건 검증 — 동시성 경쟁 · 계정 전환 · 실패 전파
 ```
 
-`Scripts/`는 앱 타깃 밖이라 컴파일되지 않습니다. 테스트 타깃이 없는 동안 계약과 인증을
-검사하는 수단이라, 각 폴더 README에 절차와 **음성 대조군**(일부러 깨뜨려 실패가 나오는지)을
-적어 뒀습니다.
+`Scripts/`는 앱 타깃 밖이라 컴파일되지 않습니다. 테스트 타깃이 없는 동안의 유일한 실행
+검증이라, 각 폴더 README에 절차와 **음성 대조군**(일부러 깨뜨려 실패가 나오는지)을 적어
+뒀습니다. 통과만 보고 끝내면 하니스가 아무것도 검사하지 않아도 통과합니다.
 
 > **Keychain은 서명 없이 검증할 수 없습니다.** 아래 컴파일 검증 명령(`CODE_SIGNING_ALLOWED=NO`)으로
 > 빌드한 앱은 엔타이틀먼트가 없어 `SecItemAdd`가 -34018(`errSecMissingEntitlement`)로 실패합니다.
