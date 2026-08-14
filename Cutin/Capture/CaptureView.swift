@@ -50,7 +50,7 @@ struct CaptureView: View {
                 dismiss()
             }
             Spacer()
-            ProgressDots(total: flow.count.rawValue, current: flow.cuts.count)
+            ProgressDots(total: flow.cutCount, current: flow.cuts.count)
                 .padding(.horizontal, Spacing.x3)
                 .padding(.vertical, Spacing.x1)
                 .glassEffect(.regular, in: .capsule)
@@ -126,7 +126,7 @@ struct CaptureView: View {
         if let index = flow.retakeIndex {
             return "\(index + 1)번째 컷 다시 찍기"
         }
-        return "\(flow.nextSlot) / \(flow.count.rawValue)"
+        return "\(flow.nextSlot) / \(flow.cutCount)"
     }
 
     /* 촬영 실패를 조용히 넘기면 사용자는 셔터가 고장 난 줄 안다 — 이전 구현은 `try?`로 삼켰다.
@@ -201,7 +201,7 @@ struct CaptureView: View {
 
     private var thumbnails: some View {
         HStack(spacing: Spacing.x1) {
-            ForEach(0..<flow.count.rawValue, id: \.self) { index in
+            ForEach(0..<flow.cutCount, id: \.self) { index in
                 let filled = index < flow.cuts.count
                 let isRetake = flow.retakeIndex == index
                 let isNext = !filled && index == flow.cuts.count && flow.retakeIndex == nil
@@ -247,7 +247,7 @@ struct CaptureView: View {
     /// 이 검사가 없으면 사진을 찍고 아무 일도 일어나지 않는다 — draft를 이어 쓰면 컷이
     /// 다 찬 채로 카메라 화면에 서 있는 상태가 정상 경로가 된다(§5.3).
     private var hasSlot: Bool {
-        flow.retakeIndex != nil || flow.cuts.count < flow.count.rawValue
+        flow.retakeIndex != nil || flow.cuts.count < flow.cutCount
     }
 
     private var shutterRow: some View {
@@ -282,7 +282,7 @@ struct CaptureView: View {
 
     /// burst: 3-2-1 카운트다운 → 촬영, 남은 컷이 있으면 반복.
     private func runBurst() async {
-        while !Task.isCancelled, flow.cuts.count < flow.count.rawValue {
+        while !Task.isCancelled, flow.cuts.count < flow.cutCount {
             for tick in stride(from: 3, through: 1, by: -1) {
                 if Task.isCancelled { break }
                 withAnimation { countdown = tick }

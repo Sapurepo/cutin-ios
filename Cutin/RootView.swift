@@ -16,6 +16,7 @@ struct RootView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(CaptureFlow.self) private var flow
+    @Environment(TemplateCatalog.self) private var catalog
 
     @State private var coordinator = AppCoordinator()
     @State private var pendingIntent: CaptureIntent?
@@ -53,6 +54,11 @@ struct RootView: View {
         }
         .environment(\.palette, Palette.of(colorScheme))
         .tint(Palette.of(colorScheme).accent)
+        /* 템플릿 목록을 로그인 뒤 **미리** 받는다(`/templates`·`/frames`가 auth 필요).
+         * 촬영 설정 화면도 스스로 부르지만, 그때 받기 시작하면 촬영을 열자마자 로딩을 본다.
+         * 이어쓰기 경로는 설정 화면을 건너뛰므로 여기서 받아 두지 않으면 편집 1단계의
+         * 배치·프레임 칩이 빈 줄로 뜬다. */
+        .task { await catalog.loadIfNeeded() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 /* 만료는 읽는 시점 판정이지만(§5.3) 이 객체는 앱 수명이라 시작 시 한 번만으로는

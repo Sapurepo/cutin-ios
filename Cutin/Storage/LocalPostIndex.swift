@@ -2,6 +2,7 @@
  *
  * ① **스키마 봉투** — 이전 형식은 최상위가 그냥 배열이라 레코드 모양이 바뀌면 구버전 파일을
  *    알아볼 방법이 없었다. `schemaVersion`을 씌우고, 봉투 없는 옛 파일은 v0으로 읽어 올린다.
+ *    그 장치가 v2에서 처음 실제로 쓰인다 — 아래 `discarded` 참고.
  *
  * ② **디코드 실패 시 원본을 덮어쓰지 않는다** — 이전 구현은 `?? []`로 빈 배열을 삼킨 뒤
  *    다음 저장에서 posts.json을 빈 배열로 덮어썼다. 사용자 눈에는 포스트가 전부 사라지고
@@ -17,16 +18,30 @@ struct LocalPostIndex: Sendable {
         self.vault = vault
     }
 
-    static let currentSchema = 1
+    /* v2: 레코드가 `count`·`layout`·`frameID`(로컬 열거형) 대신 서버 템플릿·프레임 스냅샷을
+     * 갖는다. **v1 이하는 새 모델로 디코드되지 않는다.**
+     *
+     * 0.2.0의 결정은 "기존 로컬 포스트는 버린다"다(실기기 검증도 안 된 개발 빌드라 옮길 만한
+     * 사용자 데이터가 없다). 마이그레이션 코드를 쓰지 않는 대신, **버리는 것과 손상된 것을
+     * 반드시 갈라야 한다** — 옛 파일을 디코드 실패로 흘려보내면 `.quarantined`가 되어
+     * "인덱스가 망가졌다"는 잘못된 신호를 내고 파일이 `.corrupt`로 쌓인다. */
+    static let currentSchema = 2
 
     private struct Envelope: Codable {
         var schemaVersion: Int
         var posts: [ComposedPost]
     }
 
+    /// 레코드 모양과 무관하게 버전만 읽는다 — 구버전을 손상으로 오해하지 않기 위한 최소 봉투.
+    private struct SchemaStamp: Decodable {
+        var schemaVersion: Int
+    }
+
     enum Outcome {
         /// 정상 로드 (봉투 없는 v0에서 올라온 경우 `migrated == true`)
         case loaded([ComposedPost], migrated: Bool)
+        /// 구버전 스키마라 의도적으로 버렸다. 손상이 아니므로 새로 써도 된다
+        case discarded(from: Int)
         /// 파일이 없다 — 첫 실행이거나 인덱스를 잃었다. 새로 써도 잃을 게 없다
         case absent
         /// 디코드 실패. 원본을 이 경로로 치워 뒀으므로 새로 써도 안전하다
@@ -42,12 +57,20 @@ struct LocalPostIndex: Sendable {
         guard let data = try? vault.read(name) else { return .unwritable }
 
         let decoder = FileVault.decoder()
-        if let envelope = try? decoder.decode(Envelope.self, from: data) {
-            return .loaded(envelope.posts, migrated: envelope.schemaVersion < Self.currentSchema)
-        }
-        // v0: 봉투 없는 최상위 배열
-        if let posts = try? decoder.decode([ComposedPost].self, from: data) {
-            return .loaded(posts, migrated: true)
+
+        /* 레코드보다 **버전을 먼저** 읽는다. 순서를 뒤집어 레코드 디코드를 먼저 시도하면
+         * 구버전 파일이 손상 판정을 받는다. */
+        if let stamp = try? decoder.decode(SchemaStamp.self, from: data) {
+            guard stamp.schemaVersion >= Self.currentSchema else {
+                return .discarded(from: stamp.schemaVersion)
+            }
+            if let envelope = try? decoder.decode(Envelope.self, from: data) {
+                return .loaded(envelope.posts, migrated: false)
+            }
+        } else if (try? decoder.decode([ComposedPost].self, from: data)) != nil
+                    || (try? decoder.decode([SchemaStamp].self, from: data)) != nil {
+            // v0: 봉투 없는 최상위 배열. 이제는 버린다 (v1과 같은 이유)
+            return .discarded(from: 0)
         }
         // 치우기에 실패하면 원본이 제자리에 남는다 — 그때 새로 쓰면 지키려던 바이트가 사라진다.
         guard let quarantine = try? vault.moveAside(name, suffix: "corrupt") else {
