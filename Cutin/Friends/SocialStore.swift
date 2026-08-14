@@ -154,47 +154,45 @@ final class SocialStore {
      * "언팔로우가 안 된다"로 보이지만 서버에서는 이미 끊긴 뒤다.
      *
      * 그래서 언팔로우는 프로필을 다시 받는다. 관계를 손으로 맞추지 않는 이유는 위 머리말과
-     * 같다 — 왕복 하나를 아끼려고 서버 규칙의 사본을 만들지 않는다. */
-    func toggleFollow(id: UUID) async {
+     * 같다 — 왕복 하나를 아끼려고 서버 규칙의 사본을 만들지 않는다.
+     *
+     * 실패를 `searchResults.failure`에 담지 않고 **던진다.** 그 자리는 검색 목록의 것이라 타인
+     * 프로필 화면이 읽지 않는다 — 담아 두면 팔로우가 실패해도 화면에 아무 일도 일어나지 않고,
+     * 엉뚱하게 나중에 검색 결과 자리에 옛 문구가 뜬다. */
+    func toggleFollow(id: UUID) async throws {
         guard let profile = profiles[id] else { return }
-        do {
-            if profile.following {
-                try await client.send(.delete, "/users/\(id.path)/follow")
-                await loadProfile(id: id)
-            } else {
-                let result = try await client.send(
-                    .post, "/users/\(id.path)/follow", as: FollowResult.self
-                )
-                profiles[id] = profile.replacing(following: result.following,
-                                                 friend: result.friend)
-            }
-            // 친구 목록이 달라졌다. 커서 목록이라 직접 고치지 않고 다시 받는다.
-            friends.invalidate()
-            followees.invalidate()
-        } catch {
-            searchResults.failure = message(for: error)
+        if profile.following {
+            try await client.send(.delete, "/users/\(id.path)/follow")
+            await loadProfile(id: id)
+        } else {
+            let result = try await client.send(
+                .post, "/users/\(id.path)/follow", as: FollowResult.self
+            )
+            profiles[id] = profile.replacing(following: result.following,
+                                             friend: result.friend)
         }
+        // 친구 목록이 달라졌다. 커서 목록이라 직접 고치지 않고 다시 받는다.
+        friends.invalidate()
+        followees.invalidate()
     }
 
     /// 차단·해제. 둘 다 본문 없이 204다.
     ///
     /// 차단하면 **서버가 양방향 팔로우와 친구 관계를 함께 끊는다**(컨트롤러 설명).
     /// 해제해도 끊긴 팔로우는 복구되지 않는다 — 앱이 맞출 수 있는 상태가 아니라 다시 받는다.
-    func toggleBlock(id: UUID) async {
+    ///
+    /// 실패는 `toggleFollow`와 같은 이유로 던진다.
+    func toggleBlock(id: UUID) async throws {
         guard let profile = profiles[id] else { return }
-        do {
-            try await client.send(
-                profile.blocking ? .delete : .post, "/users/\(id.path)/block"
-            )
-            /* 차단하면 서버가 팔로우 관계도 끊는다. 프로필을 다시 받아 **서버가 만든 상태**를
-             * 그대로 쓴다 — 여기서 네 값을 손으로 맞추면 서버 규칙의 사본이 하나 더 생긴다. */
-            await loadProfile(id: id)
-            friends.invalidate()
-            followees.invalidate()
-            followers.invalidate()
-        } catch {
-            searchResults.failure = message(for: error)
-        }
+        try await client.send(
+            profile.blocking ? .delete : .post, "/users/\(id.path)/block"
+        )
+        /* 차단하면 서버가 팔로우 관계도 끊는다. 프로필을 다시 받아 **서버가 만든 상태**를
+         * 그대로 쓴다 — 여기서 네 값을 손으로 맞추면 서버 규칙의 사본이 하나 더 생긴다. */
+        await loadProfile(id: id)
+        friends.invalidate()
+        followees.invalidate()
+        followers.invalidate()
     }
 
     // MARK: - 신고 (§1-7)
@@ -211,6 +209,18 @@ final class SocialStore {
             ),
             as: Report.self
         )
+    }
+
+    /* 계정이 바뀌었다. 관계는 **보는 사람 기준**이라(`following`·`friend`·`blocking`) 한 줄도
+     * 남길 수 없다 — 이전 계정의 친구 목록과 관계 표시가 그대로 새 계정 화면에 뜬다. */
+    func reset() {
+        users = [:]
+        profiles = [:]
+        friends = List()
+        followers = List()
+        followees = List()
+        searchResults = List()
+        recommended = []
     }
 
     private func message(for error: any Error) -> String {

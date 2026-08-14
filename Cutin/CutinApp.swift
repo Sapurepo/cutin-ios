@@ -29,12 +29,31 @@ struct CutinApp: App {
         /* 세션과 카탈로그가 **같은 전송 계층**을 쓴다. 따로 만들면 카탈로그 쪽 클라이언트에는
          * 액세스 토큰도 재발급 경로도 없어서 `/templates`(auth 필요)가 401로 끝난다. */
         let client = APIClient()
-        session = AuthSession(client: client)
+        let session = AuthSession(client: client)
+        let store = PostStore(client: client)
+        let social = SocialStore(client: client)
+        let comments = CommentStore(client: client)
+
+        /* 계정이 바뀌면 서버에서 받아 둔 것을 전부 버린다.
+         *
+         * 스토어는 앱 수명이고 로그아웃은 화면만 바꾸므로, 비우지 않으면 **다음 계정이 이전
+         * 계정의 피드를 본다.** 화면이 다시 만들어져도 `hasLoaded == true`라 `loadFeed()`가
+         * 그대로 돌아 나가고, 커서가 남아 있으면 이전 계정 목록 위에 새 계정 페이지를 덧붙인다.
+         *
+         * `TemplateCatalog`는 비우지 않는다 — 템플릿·프레임은 계정의 것이 아니라 서버 전체의
+         * 것이고, 비우면 다음 로그인이 왕복 둘을 다시 낸다. */
+        session.onAccountChange = {
+            store.reset()
+            social.reset()
+            comments.reset()
+        }
+
+        self.session = session
+        self.store = store
+        self.social = social
+        self.comments = comments
         catalog = TemplateCatalog(client: client)
-        store = PostStore(client: client)
         publisher = PostPublisher(client: client)
-        social = SocialStore(client: client)
-        comments = CommentStore(client: client)
     }
 
     var body: some Scene {

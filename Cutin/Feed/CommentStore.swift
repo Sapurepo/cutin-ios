@@ -113,6 +113,12 @@ final class CommentStore {
         }
     }
 
+    /// 계정이 바뀌었다. 남의 계정으로 받아 둔 댓글을 그대로 두면 "삭제" 메뉴 판정
+    /// (`comment.author.id == session.userId`)이 새 계정 기준으로 다시 그려진다.
+    func reset() {
+        lists = [:]
+    }
+
     private func message(for error: any Error) -> String {
         switch error {
         case APIError.transport:
