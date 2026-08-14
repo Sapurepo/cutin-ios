@@ -8,11 +8,17 @@
  * 만나면 이 객체를 거쳐 새 토큰을 받아 Keychain에 남긴다. 반대 방향(전송 계층이 Keychain을
  * 직접 아는 것)으로 두면 둘이 서로를 알게 된다.
  *
- * 온보딩(닉네임)은 다음 브랜치다. 여기서는 서버가 준 `onboardingCompleted`를 그대로 들고만
- * 있는다 — 값을 버리면 그 브랜치가 로그인 응답 처리를 다시 열어야 한다. */
+ * 온보딩(§3.1)과 프로필 수정(§3.4·§8.1)도 여기 있다. 셋 다 **로그인한 사용자 자신의 계정**을
+ * 다루고 결과가 `phase`의 프로필로 돌아오므로, 화면에 두면 프로필의 주인이 둘이 된다. */
 
-import Foundation
 import Observation
+import UIKit
+import os
+
+/* 실패한 오류 **자체**를 남긴다. 화면 문구는 카카오 SDK 오류를 "로그인에 실패했어요" 한 문장으로
+ * 뭉개므로(`message(for:)`의 default), 이것이 없으면 앱 키·번들 ID·동의항목 중 무엇이 틀렸는지
+ * 알 방법이 없다 — 재현해도 남는 것이 그 한 문장뿐이다. */
+private let authLog = Logger(subsystem: "com.sapurepo.cutin", category: "auth")
 
 @MainActor
 @Observable
@@ -26,7 +32,8 @@ final class AuthSession {
 
     private(set) var phase: Phase = .restoring
 
-    /// 로그인 시도 중. 버튼을 잠그고 표시를 바꾸는 데 쓴다.
+    /// 서버에 계정 관련 요청을 보내는 중(로그인·온보딩). 버튼을 잠그고 표시를 바꾸는 데 쓴다.
+    /// 두 화면은 `phase`로 갈려 동시에 뜨지 않으므로 깃발 하나로 충분하다.
     private(set) var isAuthenticating = false
 
     /// 마지막 실패. 사용자가 취소한 경우는 담지 않는다.
@@ -44,10 +51,10 @@ final class AuthSession {
         return false
     }
 
-    /// 서버가 온보딩(닉네임)을 마쳤다고 보는지. 다음 브랜치가 이 값으로 분기한다.
-    var needsOnboarding: Bool {
-        if case .signedIn(let profile) = phase { return !profile.onboardingCompleted }
-        return false
+    /// 로그인한 사용자의 id. "내 포스트인가"를 가르는 데 화면들이 쓴다.
+    var userId: UUID? {
+        if case .signedIn(let profile) = phase { return profile.id }
+        return nil
     }
 
     // MARK: - 시작
@@ -111,6 +118,7 @@ final class AuthSession {
         } catch is CancellationError {
             // 로그인 창을 닫은 것. 오류로 보여주지 않는다.
         } catch {
+            authLog.error("카카오 로그인 실패: \(String(describing: error), privacy: .public)")
             failure = message(for: error)
         }
     }
@@ -120,6 +128,112 @@ final class AuthSession {
     func signOut() async {
         try? await client.send(.post, "/auth/logout")
         await signOutLocally()
+    }
+
+    // MARK: - 온보딩 (§3.1)
+
+    /* 닉네임 확인과 저장이 화면이 아니라 여기 있는 이유: 둘 다 **로그인한 사용자 자신의 계정**을
+     * 다루고, 저장 결과가 `phase`의 프로필로 돌아온다. 화면에 두면 프로필의 주인이 둘이 되고,
+     * 전송 계층도 둘이 들게 된다. 키 입력·디바운스 같은 화면 상태는 화면에 남는다. */
+    func checkNickname(_ nickname: String) async throws -> NicknameAvailability {
+        try await client.send(
+            .get, "/users/nickname/availability",
+            query: ["nickname": nickname], as: NicknameAvailability.self
+        )
+    }
+
+    /* 닉네임을 저장하고 온보딩을 닫는다. 왕복이 둘인 이유는 서버가
+     * `POST /users/me/onboarding/complete`에서 닉네임이 없으면 거절하기 때문이다(`NICKNAME_REQUIRED`).
+     *
+     * **저장된 이름과 같으면 PATCH를 건너뛴다.** 서버의 `isNicknameTaken`이 자기 자신을 제외하지
+     * 않아서, 같은 이름을 다시 보내면 **자기 이름에 409**가 난다. 첫 왕복만 성공하고 둘째가
+     * 끊긴 뒤 재시도하는 경로가 실제로 그 상황이다.
+     *
+     * PATCH 결과를 곧바로 `phase`에 넣는 것도 같은 이유다 — 둘째가 실패해도 "이름은 저장됐고
+     * 온보딩만 안 닫혔다"는 상태가 남아, 다시 눌렀을 때 PATCH를 건너뛰고 이어진다.
+     *
+     * 타임존을 같이 싣는다. 서버 기본값이 `Asia/Seoul`이고 알림 발송이 이 값을 쓰는데, 프로필을
+     * 쓰는 시점이 여기뿐이라 지금 넣지 않으면 다른 시간대의 사용자가 서울 시각으로 알림을 받는다. */
+    func completeOnboarding(nickname: String) async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        failure = nil
+        defer { isAuthenticating = false }
+
+        do {
+            if case .signedIn(let profile) = phase, profile.nickname != nickname {
+                phase = .signedIn(try await client.send(
+                    .patch, "/users/me",
+                    body: UpdateMeBody(nickname: nickname, timezone: TimeZone.current.identifier),
+                    as: UserProfile.self
+                ))
+            }
+            phase = .signedIn(try await client.send(
+                .post, "/users/me/onboarding/complete", as: UserProfile.self
+            ))
+        } catch {
+            failure = message(for: error)
+        }
+    }
+
+    // MARK: - 프로필 수정 (§3.4 · §8.1)
+
+    /* 온보딩을 마친 뒤 닉네임을 바꾼다(명세 §3.1 "변경은 추후 프로필에서").
+     * `completeOnboarding`과 같은 409 함정을 피해야 하므로 건너뛰기 조건이 여기도 있다. */
+    func updateNickname(_ nickname: String) async {
+        guard case .signedIn(let profile) = phase, profile.nickname != nickname else { return }
+        await patchProfile(UpdateMeBody(nickname: nickname))
+    }
+
+    /* 아바타 사진(§3.4). 왕복이 **넷**이다 — 업로드 셋(`MediaUploader`) + 프로필 PATCH.
+     *
+     * 화면이 아니라 여기서 이어 붙이는 이유는 `CaptureFlow.commit`과 같다: 중간에 화면이
+     *사라지면(탭 전환·시트 닫기) 남은 왕복이 죽은 화면의 상태에 쓰인다. 서버는 **ready이고
+     * kind가 avatar인 자기 미디어**만 프로필에 붙여 주므로(`MEDIA_NOT_READY`), 셋을 끝내기
+     * 전에 PATCH가 나가면 400이다.
+     *
+     * `UIKit`을 여기서 쓰는 대가로 그 순서를 한곳에 묶었다. */
+    func uploadAvatar(_ image: UIImage) async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        failure = nil
+        defer { isAuthenticating = false }
+
+        do {
+            let media = try await MediaUploader(client: client).upload(image, kind: .avatar)
+            phase = .signedIn(try await client.send(
+                .patch, "/users/me",
+                body: UpdateMeBody(avatarMediaId: .value(media.id)), as: UserProfile.self
+            ))
+        } catch {
+            failure = message(for: error)
+        }
+    }
+
+    /// 사진 앱이 바이트를 내주지 못했다(iCloud 다운로드 실패 등). 서버에 간 적이 없으므로
+    /// 서버 문구가 없고, 실패 표시는 다른 실패와 같은 자리에 있어야 한다.
+    func failAvatarPreparation() {
+        failure = "사진을 불러오지 못했어요. 다른 사진을 골라주세요"
+    }
+
+    /// 기본 이미지로 되돌린다. `null`을 실어야 지워지므로 `Field.null`이다 — 키를 빼면 "안 건드림"이다.
+    func removeAvatar() async {
+        await patchProfile(UpdateMeBody(avatarMediaId: .null))
+    }
+
+    private func patchProfile(_ body: UpdateMeBody) async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        failure = nil
+        defer { isAuthenticating = false }
+
+        do {
+            phase = .signedIn(try await client.send(
+                .patch, "/users/me", body: body, as: UserProfile.self
+            ))
+        } catch {
+            failure = message(for: error)
+        }
     }
 
     // MARK: - 내부

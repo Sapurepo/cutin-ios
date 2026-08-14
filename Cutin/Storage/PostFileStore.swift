@@ -1,8 +1,10 @@
-/* 합성 결과 JPEG의 저장·삭제·디코드.
+/* JPEG 쓰기와 다운샘플 디코드.
  *
- * 디코드는 **표시 크기에 맞춰 다운샘플**하고 메인 액터에서 하지 않는다. 이전 구현은
- * `UIImage(contentsOfFile:)`로 1080px JPEG을 뷰 본문에서 통째로 디코드했고, LazyVStack이
- * 셀을 만들 때마다 그게 메인 스레드에서 일어나 스크롤이 끊겼다. */
+ * 합성 결과가 서버로 가면서 남은 소비처는 **진행 중인 촬영의 컷**(`DraftStore`) 하나다.
+ * 인덱스·삭제·파일 URL을 다루던 메서드들은 그 소비처(`FeedStore`)와 함께 사라졌다.
+ *
+ * 디코드는 표시 크기에 맞춰 다운샘플하고 메인 액터에서 하지 않는다 — 12MP 컷을 뷰 본문에서
+ * 통째로 디코드하면 그게 메인 스레드에서 일어난다. */
 
 import ImageIO
 import UIKit
@@ -16,32 +18,11 @@ struct PostFileStore: Sendable {
 
     static let fileExtension = "jpg"
 
-    func filename(for id: UUID) -> String {
-        "\(id.uuidString).\(Self.fileExtension)"
-    }
-
     func write(_ image: UIImage, to name: String) throws {
         guard let data = image.jpegData(compressionQuality: 0.92) else {
             throw PostStoreError.encodeFailed
         }
         try vault.write(data, to: name)
-    }
-
-    func remove(_ name: String) throws {
-        try vault.remove(name)
-    }
-
-    func storedNames() throws -> [String] {
-        try vault.names(withExtension: Self.fileExtension)
-    }
-
-    func creationDate(_ name: String) -> Date? {
-        vault.creationDate(name)
-    }
-
-    /// 공유·사진 앱 저장은 디코드한 이미지가 아니라 원본 파일을 넘긴다 — 재인코딩 손실이 없다.
-    func url(_ name: String) -> URL {
-        vault.url(name)
     }
 
     /// `maxPixel`은 긴 변 기준 상한. 호출자가 표시 크기를 알고 넘긴다.
