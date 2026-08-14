@@ -137,6 +137,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, page(owner, cursor))
             return
 
+        # 관계 목록. `/users/` 접두 분기보다 **먼저** 와야 한다 — 뒤에 두면 프로필 응답이
+        # 돌아가고 UserPage 디코드가 실패해, 검사가 그 경로를 아예 밟지 않는다.
+        # 실제로 처음에 그렇게 두어 ⑥의 SocialStore 검사가 통과만 하고 있었다.
+        if parsed.path in ("/users/me/friends", "/users/me/followers", "/users/me/followees"):
+            with lock:
+                delay = state["delay"]
+            time.sleep(delay)
+            self._send(200, {"items": [{"id": USER_B, "nickname": "B", "avatarUrl": None}],
+                             "nextCursor": None})
+            return
+
         if parsed.path.startswith("/users/") and parsed.path.endswith("/posts"):
             owner = parsed.path[len("/users/"):-len("/posts")]
             with lock:

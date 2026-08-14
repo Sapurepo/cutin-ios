@@ -37,6 +37,7 @@ enum FollowupHarness {
         await scenarioResetOnAccountSwitch()
         await scenarioFailuresPropagate()
         scenarioAccountChangeHook()
+        await scenarioResetMidFlight()
 
         print("=== 결과: \(failures == 0 ? "전부 통과" : "실패 \(failures)건") ===")
         fflush(stdout)
@@ -211,6 +212,42 @@ enum FollowupHarness {
 
         session.applyPhaseForTesting(.signedOut)
         check("로그아웃하면 부른다", calls == 3, "\(calls)회")
+    }
+
+    // MARK: - ⑥ 비우는 순간 날아가 있던 요청
+
+    /* 비우는 것만으로는 부족하다. 로그아웃 버튼은 **프로필 탭 툴바**에 있고 그 화면이 열리며
+     * 목록을 받으므로, "요청이 날아가 있는 동안 로그아웃"이 실제로 겹치는 창이다.
+     *
+     * 세대 검사가 없으면 뒤늦게 도착한 응답이 방금 비운 자리에 옛 계정 목록을 되살린다 —
+     * `reset()`이 한 일을 정확히 되돌린다. */
+    private static func scenarioResetMidFlight() async {
+        print("=== ⑥ 로드 중 계정 전환 — 뒤늦은 응답을 버린다 ===")
+        await reset()
+        let client = await signedInClient()
+        let store = PostStore(client: client)
+        let social = SocialStore(client: client)
+
+        // 응답이 오기 전에 비운다(스텁이 250ms 늦춘다).
+        async let feed: Void = store.loadFeed()
+        async let friends: Void = social.loadFriends()
+        try? await Task.sleep(for: .milliseconds(50))
+        store.reset()
+        social.reset()
+        _ = await (feed, friends)
+
+        check("피드가 비어 있다", store.feed.ids.isEmpty, "\(store.feed.ids.count)건")
+        check("포스트 사전이 비어 있다", store.posts.isEmpty, "\(store.posts.count)건")
+        /* `hasLoaded`가 되살아나면 다음 계정의 `loadFeed()`가 "이미 받았다"며 돌아 나간다 —
+         * 화면에는 빈 피드가 남고 새로고침해야만 채워진다. */
+        check("hasLoaded가 되살아나지 않았다", !store.feed.hasLoaded)
+        check("친구 목록이 비어 있다", social.friends.ids.isEmpty, "\(social.friends.ids.count)건")
+        check("사용자 사전이 비어 있다", social.users.isEmpty, "\(social.users.count)건")
+
+        // 비운 뒤 다시 받으면 정상적으로 채워진다 — 세대 검사가 이후 요청까지 막지는 않는다.
+        await store.loadFeed()
+        check("이후 요청은 정상으로 채워진다", !store.feed.ids.isEmpty,
+              "\(store.feed.ids.count)건")
     }
 
     private static func profileForTesting(id: UUID, nickname: String = "네컷러버") -> UserProfile {

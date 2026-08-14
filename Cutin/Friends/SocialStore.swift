@@ -68,14 +68,19 @@ final class SocialStore {
         if !refresh, !self[keyPath: list].canLoadMore, self[keyPath: list].hasLoaded { return }
 
         let cursor = refresh ? nil : self[keyPath: list].nextCursor
+        let generation = generation
         self[keyPath: list].isLoading = true
         self[keyPath: list].failure = nil
-        defer { self[keyPath: list].isLoading = false }
+        defer {
+            if generation == self.generation { self[keyPath: list].isLoading = false }
+        }
 
         do {
             var query = query
             if let cursor { query["cursor"] = cursor }
             let page = try await client.send(.get, path, query: query, as: UserPage.self)
+            // 기다리는 사이 계정이 바뀌었으면 이전 계정의 관계다(`reset()` 참고).
+            guard generation == self.generation else { return }
             for item in page.items { users[item.id] = item }
 
             let ids = page.items.map(\.id)
@@ -88,6 +93,7 @@ final class SocialStore {
             self[keyPath: list].nextCursor = page.nextCursor
             self[keyPath: list].hasLoaded = true
         } catch {
+            guard generation == self.generation else { return }
             self[keyPath: list].failure = message(for: error)
         }
     }
@@ -124,21 +130,28 @@ final class SocialStore {
     func loadRecommended() async {
         guard !isLoadingRecommended, recommended.isEmpty else { return }
         isLoadingRecommended = true
+        let generation = generation
         defer { isLoadingRecommended = false }
         // 실패는 삼킨다 — 추천은 없어도 되는 목록이고, 화면에 자리도 없다.
-        recommended = (try? await client.send(
+        let items = (try? await client.send(
             .get, "/users/recommended", as: RecommendedUsers.self
         ))?.items ?? []
+        guard generation == self.generation else { return }
+        recommended = items
     }
 
     // MARK: - 한 사람
 
     func loadProfile(id: UUID) async {
+        let generation = generation
         do {
-            profiles[id] = try await client.send(
+            let profile = try await client.send(
                 .get, "/users/\(id.path)", as: PublicProfile.self
             )
+            guard generation == self.generation else { return }
+            profiles[id] = profile
         } catch let error as APIError where error.isNotFound {
+            guard generation == self.generation else { return }
             profiles[id] = nil
         } catch {
             // 이미 그리고 있는 값이 있으면 그대로 둔다.
@@ -214,6 +227,7 @@ final class SocialStore {
     /* 계정이 바뀌었다. 관계는 **보는 사람 기준**이라(`following`·`friend`·`blocking`) 한 줄도
      * 남길 수 없다 — 이전 계정의 친구 목록과 관계 표시가 그대로 새 계정 화면에 뜬다. */
     func reset() {
+        generation += 1
         users = [:]
         profiles = [:]
         friends = List()
@@ -222,6 +236,9 @@ final class SocialStore {
         searchResults = List()
         recommended = []
     }
+
+    /// 계정 세대. 날아가 있던 요청이 비운 자리를 되살리지 않도록 한다(`PostStore`와 같다).
+    @ObservationIgnored private var generation = 0
 
     private func message(for error: any Error) -> String {
         switch error {

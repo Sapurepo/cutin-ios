@@ -42,13 +42,16 @@ final class CommentStore {
         if !refresh, list.hasLoaded, list.nextCursor == nil { return }
 
         let cursor = refresh ? nil : list.nextCursor
+        let generation = generation
         list.isLoading = true
         list.failure = nil
         lists[postId] = list
         defer {
-            var done = self.list(for: postId)
-            done.isLoading = false
-            lists[postId] = done
+            if generation == self.generation {
+                var done = self.list(for: postId)
+                done.isLoading = false
+                lists[postId] = done
+            }
         }
 
         do {
@@ -57,6 +60,8 @@ final class CommentStore {
                 query: cursor.map { ["cursor": $0] } ?? [:],
                 as: CommentPage.self
             )
+            // 기다리는 사이 계정이 바뀌었으면 이전 계정으로 받은 댓글이다(`reset()` 참고).
+            guard generation == self.generation else { return }
             var updated = self.list(for: postId)
             if refresh {
                 updated.items = page.items
@@ -68,6 +73,7 @@ final class CommentStore {
             updated.hasLoaded = true
             lists[postId] = updated
         } catch {
+            guard generation == self.generation else { return }
             var failed = self.list(for: postId)
             failed.failure = message(for: error)
             lists[postId] = failed
@@ -116,8 +122,12 @@ final class CommentStore {
     /// 계정이 바뀌었다. 남의 계정으로 받아 둔 댓글을 그대로 두면 "삭제" 메뉴 판정
     /// (`comment.author.id == session.userId`)이 새 계정 기준으로 다시 그려진다.
     func reset() {
+        generation += 1
         lists = [:]
     }
+
+    /// 계정 세대. 날아가 있던 요청이 비운 자리를 되살리지 않도록 한다(`PostStore`와 같다).
+    @ObservationIgnored private var generation = 0
 
     private func message(for error: any Error) -> String {
         switch error {

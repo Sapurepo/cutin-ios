@@ -79,14 +79,17 @@ final class PostStore {
         if !refresh, !get().canLoadMore, get().hasLoaded { return }
 
         let cursor = refresh ? nil : get().nextCursor
+        let generation = generation
         var starting = get()
         starting.isLoading = true
         starting.failure = nil
         set(starting)
         defer {
-            var done = get()
-            done.isLoading = false
-            set(done)
+            if generation == self.generation {
+                var done = get()
+                done.isLoading = false
+                set(done)
+            }
         }
 
         do {
@@ -95,6 +98,10 @@ final class PostStore {
                 query: cursor.map { ["cursor": $0] } ?? [:],
                 as: PostPage.self
             )
+            /* 기다리는 사이 계정이 바뀌었으면 이 응답은 **이전 계정의 것**이다. 쓰면 방금 비운
+             * 자리에 옛 목록이 되살아난다 — `reset()`이 한 일을 정확히 되돌린다. 로그아웃 버튼이
+             * 프로필 탭 툴바에 있고 그 화면이 열리며 목록을 받으므로, 실제로 겹치는 창이다. */
+            guard generation == self.generation else { return }
             merge(page.items)
             let ids = page.items.map(\.id)
             /* 새로고침은 갈아끼우고, 더 받기는 뒤에 붙인다. 붙일 때 중복을 거르는 이유는
@@ -111,6 +118,7 @@ final class PostStore {
             updated.hasLoaded = true
             set(updated)
         } catch {
+            guard generation == self.generation else { return }
             var failed = get()
             failed.failure = message(for: error)
             set(failed)
@@ -235,13 +243,20 @@ final class PostStore {
     }
 
     /* 계정이 바뀌었다. 받아 둔 것은 전부 이전 계정의 것이므로 버린다 —
-     * **커서와 `hasLoaded`까지** 비워야 다음 계정이 처음부터 받는다(`CutinApp` 주석 참고). */
+     * **커서와 `hasLoaded`까지** 비워야 다음 계정이 처음부터 받는다(`CutinApp` 주석 참고).
+     *
+     * 세대를 올리는 것이 비우는 것만큼 중요하다. 비우는 순간 날아가 있던 요청이 뒤늦게
+     * 돌아와 옛 목록을 되살리면, 비운 의미가 없다(`load`의 `generation` 검사). */
     func reset() {
+        generation += 1
         posts = [:]
         feed = List()
         bookmarks = List()
         userLists = [:]
     }
+
+    /// 계정 세대. `reset()`이 올리고, 날아가 있던 요청이 자기 세대가 지났는지 본다.
+    @ObservationIgnored private var generation = 0
 
     private func message(for error: any Error) -> String {
         switch error {
