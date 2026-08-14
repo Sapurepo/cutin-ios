@@ -1,101 +1,135 @@
 {
-  "fill-specializations" : [
-    {
-      "value" : {
-        "solid" : "extended-gray:0.00000,1.00000"
-      }
-    },
-    {
-      "appearance" : "dark",
-      "value" : {
-        "solid" : "extended-gray:0.00000,1.00000"
+  "fill" : {
+    "linear-gradient" : [
+      "extended-gray:1.00000,1.00000",
+      "display-p3:0.90268,0.90268,0.90268,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 1
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0
       }
     }
-  ],
+  },
   "groups" : [
     {
       "layers" : [
         {
           "fill" : {
-            "solid" : "extended-gray:1.00000,1.00000"
+            "solid" : "extended-srgb:0.49804,0.69804,1.00000,1.00000"
           },
           "glass" : true,
-          "image-name" : "Cut1.svg",
-          "name" : "위 팔"
+          "hidden" : false,
+          "image-name" : "petal-top.svg",
+          "name" : "Petal Top",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              -17.171875
+            ]
+          }
         }
       ],
       "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+        "kind" : "layer-color",
+        "opacity" : 0.45
       },
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "extended-gray:1.00000,1.00000"
-          },
-          "glass" : true,
-          "image-name" : "Cut2.svg",
-          "name" : "기둥 위"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "specular" : true,
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+        "value" : 0.78
       }
     },
     {
       "layers" : [
         {
           "fill" : {
-            "solid" : "extended-gray:1.00000,1.00000"
+            "solid" : "extended-srgb:0.66275,0.54902,1.00000,1.00000"
           },
           "glass" : true,
-          "image-name" : "Cut3.svg",
-          "name" : "기둥 아래"
+          "hidden" : false,
+          "image-name" : "petal-right.svg",
+          "name" : "Petal Right",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              32.484375,
+              0
+            ]
+          }
         }
       ],
       "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+        "kind" : "layer-color",
+        "opacity" : 0.45
       },
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.5
+        "value" : 0.78
       }
     },
     {
       "layers" : [
         {
           "fill" : {
-            "solid" : "extended-gray:1.00000,1.00000"
+            "solid" : "extended-srgb:0.78039,0.60784,1.00000,1.00000"
           },
           "glass" : true,
-          "image-name" : "Cut4.svg",
-          "name" : "아래 팔"
+          "hidden" : false,
+          "image-name" : "petal-bottom.svg",
+          "name" : "Petal Bottom",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              23.1875
+            ]
+          }
         }
       ],
       "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+        "kind" : "layer-color",
+        "opacity" : 0.45
       },
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.5
+        "value" : 0.78
+      }
+    },
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "solid" : "extended-srgb:0.43137,0.56078,0.96078,1.00000"
+          },
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "petal-left.svg",
+          "name" : "Petal Left",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -22.7421875,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 0.45
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.78
       }
     }
   ],
@@ -104,7 +138,8 @@
       "watchOS"
     ],
     "squares" : [
-      "iOS"
+      "iOS",
+      "macOS"
     ]
   }
 }
