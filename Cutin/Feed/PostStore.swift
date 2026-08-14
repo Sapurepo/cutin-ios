@@ -6,7 +6,7 @@
  *
  * ## 목록은 id 배열, 포스트는 사전에
  *
- * `feed`·`bookmarks`·`mine`은 **id 배열**이고 실제 포스트는 `posts` 사전에 한 벌만 둔다.
+ * `feed`·`bookmarks`·`userLists`는 **id 배열**이고 실제 포스트는 `posts` 사전에 한 벌만 둔다.
  * 목록마다 값을 복사해 두면 보관 토글이 세 곳을 각각 고쳐야 하고, 하나라도 빠뜨리면 같은
  * 포스트가 화면마다 다른 말을 한다.
  *
@@ -47,7 +47,9 @@ final class PostStore {
     private(set) var posts: [UUID: Post] = [:]
     private(set) var feed = List()
     private(set) var bookmarks = List()
-    private(set) var mine = List()
+    /* 사용자별 포스트 목록. 내 프로필과 타인 프로필이 같은 경로를 쓰므로(`/users/:id/posts`)
+     * 하나로 둔다 — 나만 따로 두면 같은 페이징 코드가 둘이 된다. */
+    private(set) var userLists: [UUID: List] = [:]
 
     @ObservationIgnored private let client: APIClient
 
@@ -106,9 +108,18 @@ final class PostStore {
         await load(\.bookmarks, path: "/users/me/bookmarks", refresh: refresh)
     }
 
-    func loadMine(authorId: UUID, refresh: Bool = false) async {
-        await load(\.mine, path: "/users/\(authorId.path)/posts", refresh: refresh)
+    func userList(id: UUID) -> List { userLists[id] ?? List() }
+
+    /* 사용자별 목록은 사전이라 키 경로를 쓸 수 없다. 같은 페이징을 두 번 쓰지 않으려고
+     * 임시 프로퍼티를 거쳐 `load`를 재사용한다 — 사전 항목에 직접 쓰는 키 경로를 만들 수 없어서다. */
+    func loadUser(id: UUID, refresh: Bool = false) async {
+        scratch = userList(id: id)
+        await load(\.scratch, path: "/users/\(id.path)/posts", refresh: refresh)
+        userLists[id] = scratch
     }
+
+    /// `loadUser`가 잠깐 쓰는 자리. 목록 하나씩만 불러오므로 겹치지 않는다.
+    @ObservationIgnored private var scratch = List()
 
     // MARK: - 한 건
 
@@ -140,8 +151,28 @@ final class PostStore {
                 wanted ? .put : .delete, "/posts/\(id.path)/bookmark",
                 as: BookmarkResult.self
             )
-            posts[id] = post.withBookmarked(result.bookmarked)
+            posts[id] = post.replacing(bookmarked: result.bookmarked)
             bookmarks.invalidate()
+        } catch {
+            feed.failure = message(for: error)
+        }
+    }
+
+    /* 반응(§7.3). 서버가 **바뀐 요약 전체**를 돌려주므로 앱이 수치를 더하고 빼지 않는다 —
+     * 같은 포스트에 여러 사람이 동시에 반응하면 손으로 센 값은 금세 어긋난다.
+     *
+     * 같은 반응을 다시 누르면 취소(`DELETE`), 다른 반응이면 교체(`PUT`)다. 교체를 위해 먼저
+     * 지울 필요가 없다 — 서버가 `PUT` 하나로 토글과 교체를 함께 처리한다. */
+    func react(id: UUID, type: ReactionType) async {
+        guard let post = posts[id] else { return }
+        let isCancel = post.reactions.mine?.known == type
+        do {
+            let summary: ReactionSummary = try await client.send(
+                isCancel ? .delete : .put, "/posts/\(id.path)/reaction",
+                body: isCancel ? nil : PutReactionBody(type: ServerEnum(type)),
+                as: ReactionSummary.self
+            )
+            posts[id] = post.replacing(reactions: summary)
         } catch {
             feed.failure = message(for: error)
         }
@@ -174,7 +205,9 @@ final class PostStore {
         posts[id] = nil
         feed.ids.removeAll { $0 == id }
         bookmarks.ids.removeAll { $0 == id }
-        mine.ids.removeAll { $0 == id }
+        for key in userLists.keys {
+            userLists[key]?.ids.removeAll { $0 == id }
+        }
     }
 
     /// 방금 발행한 포스트를 피드 맨 앞에 놓는다. 새로고침을 기다리게 하면 저장이 실패한 것처럼 보인다.
@@ -182,8 +215,11 @@ final class PostStore {
         posts[post.id] = post
         feed.ids.removeAll { $0 == post.id }
         feed.ids.insert(post.id, at: 0)
-        mine.ids.removeAll { $0 == post.id }
-        mine.ids.insert(post.id, at: 0)
+        // 내 목록에도 얹는다 — 프로필 그리드가 새로고침을 기다리지 않게.
+        if userLists[post.author.id] != nil {
+            userLists[post.author.id]?.ids.removeAll { $0 == post.id }
+            userLists[post.author.id]?.ids.insert(post.id, at: 0)
+        }
     }
 
     private func message(for error: any Error) -> String {
@@ -199,15 +235,17 @@ final class PostStore {
 }
 
 private extension Post {
-    /// 보관 여부만 바꾼 사본. `Post`가 전부 `let`이라 이 자리에서 만든다 —
+    /// 서버가 돌려준 부분 상태를 얹은 사본. `Post`가 전부 `let`이라 이 자리에서 만든다 —
     /// 서버 응답 타입을 var로 열면 어디서든 값이 바뀔 수 있게 된다.
-    func withBookmarked(_ bookmarked: Bool) -> Post {
+    func replacing(bookmarked: Bool? = nil, reactions: ReactionSummary? = nil) -> Post {
         Post(
             id: id, author: author, template: template, frame: frame,
             status: status, visibility: visibility, caption: caption,
             thumbnailCutIndex: thumbnailCutIndex, cuts: cuts, composed: composed,
             publishedAt: publishedAt, createdAt: createdAt,
-            commentCount: commentCount, reactions: reactions, bookmarked: bookmarked
+            commentCount: commentCount,
+            reactions: reactions ?? self.reactions,
+            bookmarked: bookmarked ?? self.bookmarked
         )
     }
 }

@@ -70,6 +70,31 @@ struct PostImage: View {
     }
 }
 
+/* 그리드 셀 — 내 프로필과 타인 프로필 두 그리드가 쓴다(호출부 2곳 규칙).
+ *
+ * 카드와 달리 **정사각으로 잘라 넣는다.** 템플릿 비율이 제각각이라 셀 높이가 따라가면
+ * 3열 격자가 격자로 보이지 않는다. */
+struct PostThumbnail: View {
+    let post: Post
+
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(palette.surfaceSunken)
+            if let composed = post.composed, let url = URL(string: composed.url) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color.clear
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .clipped()
+    }
+}
+
 extension Post {
     /* 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
      *

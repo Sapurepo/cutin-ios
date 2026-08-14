@@ -30,7 +30,11 @@ struct ProfileView: View {
         return nil
     }
 
-    private var posts: [Post] { store.mine.ids.compactMap(store.post(id:)) }
+    private var list: PostStore.List {
+        session.userId.map(store.userList(id:)) ?? PostStore.List()
+    }
+
+    private var posts: [Post] { list.ids.compactMap(store.post(id:)) }
 
     var body: some View {
         ScrollView {
@@ -43,12 +47,7 @@ struct ProfileView: View {
         .refreshable { await reload(refresh: true) }
         .background(palette.bg)
         .navigationTitle(AppTab.profile.title)
-        .navigationDestination(for: Route.self) { route in
-            switch route {
-            case .postDetail(let id):
-                PostDetailView(id: id)
-            }
-        }
+        .routeDestinations()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("로그아웃") { Task { await session.signOut() } }
@@ -70,7 +69,7 @@ struct ProfileView: View {
 
     private func reload(refresh: Bool) async {
         guard let id = session.userId else { return }
-        await store.loadMine(authorId: id, refresh: refresh)
+        await store.loadUser(id: id, refresh: refresh)
     }
 
     // MARK: - 상단
@@ -110,7 +109,7 @@ struct ProfileView: View {
     @ViewBuilder
     private var grid: some View {
         if posts.isEmpty {
-            if store.mine.isLoading || !store.mine.hasLoaded {
+            if list.isLoading || !list.hasLoaded {
                 ProgressView().tint(palette.textSecondary).padding(.top, Spacing.x8)
             } else {
                 EmptyStateView(
@@ -124,40 +123,17 @@ struct ProfileView: View {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(posts, id: \.id) { post in
                     NavigationLink(value: Route.postDetail(post.id)) {
-                        GridCell(post: post)
+                        PostThumbnail(post: post)
                     }
                     .buttonStyle(.plain)
                 }
 
-                if store.mine.nextCursor != nil {
+                if list.nextCursor != nil {
                     ProgressView()
                         .tint(palette.textSecondary)
                         .task { await reload(refresh: false) }
                 }
             }
         }
-    }
-}
-
-/// 그리드 셀. 합성본을 정사각으로 잘라 넣는다 — 템플릿 비율이 제각각이라 셀 높이가 튀면
-/// 그리드가 격자로 보이지 않는다.
-private struct GridCell: View {
-    let post: Post
-
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        ZStack {
-            Rectangle().fill(palette.surfaceSunken)
-            if let composed = post.composed, let url = URL(string: composed.url) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color.clear
-                }
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .clipped()
     }
 }
