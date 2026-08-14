@@ -19,4 +19,6 @@ enum Route: Hashable {
     case notifications
     /// 알림 설정(§3.3 슬롯 · §8.3 설정). 프로필에서 푸시한다.
     case notificationSettings
+    /// 서비스 팁 재열람(§3.5 "도움말에서 재열람"). 프로필 설정 메뉴에서 푸시한다.
+    case tips
 }
