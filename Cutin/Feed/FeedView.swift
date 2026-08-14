@@ -10,6 +10,7 @@ import SwiftUI
 
 struct FeedView: View {
     @Environment(PostStore.self) private var store
+    @Environment(NotificationStore.self) private var notifications
     @Environment(\.palette) private var palette
 
     var body: some View {
@@ -27,7 +28,31 @@ struct FeedView: View {
         .background(palette.bg)
         .navigationTitle("CUTIN")
         .routeDestinations()
-        .task { await store.loadFeed() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { bell }
+        }
+        .task {
+            await store.loadFeed()
+            await notifications.loadUnreadCount()
+        }
+    }
+
+    /* 알림 진입점. 탭을 만들지 않은 이유는 `NotificationsView` 머리말에 있다.
+     *
+     * 개수를 숫자로 쓰지 않고 점만 찍는다 — 목록에 들어가면 어차피 다 보이고, 숫자를 쓰면
+     * 읽음 처리가 늦게 반영될 때 그 오차가 눈에 띈다. */
+    private var bell: some View {
+        NavigationLink(value: Route.notifications) {
+            Image(systemName: "bell")
+                .overlay(alignment: .topTrailing) {
+                    if notifications.unread > 0 {
+                        Circle()
+                            .fill(palette.accent)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 4, y: -2)
+                    }
+                }
+        }
     }
 }
 
