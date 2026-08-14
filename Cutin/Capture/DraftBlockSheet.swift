@@ -70,7 +70,8 @@ struct DraftBlockSheet: View {
             .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(draft.cutCount) / \(draft.count.rawValue)컷")
+                // 목표 컷 수는 draft에 담긴 템플릿이 안다 — 템플릿을 잃은 옛 draft는 찍힌 수를 쓴다.
+                Text("\(draft.cutCount) / \(draft.targetCutCount)컷")
                     .font(Typography.numeric)
                     .foregroundStyle(palette.textPrimary)
                 Text(draft.createdAt, format: .relative(presentation: .named))

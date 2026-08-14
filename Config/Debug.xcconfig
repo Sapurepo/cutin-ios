@@ -1,1 +1,5 @@
 #include "Shared.xcconfig"
+
+// 로컬 백엔드(`pnpm dev`, .env.example의 PORT=3000).
+// 슬래시는 Shared.xcconfig의 CUTIN_SLASH로 넣는다 — 이유는 그쪽 주석 참고.
+CUTIN_API_BASE_URL = http:$(CUTIN_SLASH)$(CUTIN_SLASH)localhost:3000

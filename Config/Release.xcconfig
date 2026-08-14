@@ -1,1 +1,5 @@
 #include "Shared.xcconfig"
+
+// 운영 API 주소. **비어 있으면 첫 API 호출에서 크래시한다**(APIConfig.baseURL).
+// 조용히 폴백하지 않는 것이 의도다 — 잘못된 주소로 붙는 것보다 멈추는 편이 낫다.
+CUTIN_API_BASE_URL =
