@@ -29,10 +29,23 @@ struct AvatarPicker: View {
     private var isBusy: Bool { isPreparing || session.isAuthenticating }
 
     var body: some View {
+        /* label에 넘길 값을 **클로저 밖에서** 꺼낸다.
+         *
+         * `PhotosPicker`의 SDK 시그니처가 `@Sendable () -> Label`이라, 그 안에서 뷰의
+         * 프로퍼티(`isBusy`·`palette`)를 읽으면 메인 액터 격리 위반이다 — SwiftUI View는
+         * `body`가 `@MainActor`라 타입 전체가 그렇게 추론된다. 클로저를 프로퍼티로 빼도
+         * 같다(이전 판이 그렇게 하고도 경고가 남아 있었다). 값으로 꺼내 두면 클로저는
+         * 메인 액터 상태를 건드리지 않는다. */
+        let isBusy = isBusy
+        let palette = palette
+
         VStack(spacing: Spacing.x2) {
-            PhotosPicker(selection: $selection, matching: .images) { label }
-                .buttonStyle(.plain)
-                .disabled(isBusy)
+            PhotosPicker(selection: $selection, matching: .images) {
+                PickerLabel(url: url, nickname: nickname, size: size,
+                            isBusy: isBusy, palette: palette)
+            }
+            .buttonStyle(.plain)
+            .disabled(isBusy)
 
             if allowsRemoval, url != nil, !isBusy {
                 Button("사진 지우기") { Task { await session.removeAvatar() } }
@@ -46,9 +59,36 @@ struct AvatarPicker: View {
         }
     }
 
-    /* `PhotosPicker`의 label 클로저는 메인 액터가 아니라, 토큰 modifier를 그 안에서 부르면
-     * Swift 6가 격리 위반으로 막는다. 프로퍼티로 빼면 뷰의 격리를 그대로 물려받는다. */
-    private var label: some View {
+    private func upload(_ item: PhotosPickerItem) async {
+        isPreparing = true
+        /* 고른 항목을 비우는 것을 **먼저** 예약한다. 같은 사진을 다시 고르면 `selection`이
+         * 바뀌지 않아 `onChange`가 안 불린다 — 실패한 뒤 같은 사진으로 재시도하는 경로가 그렇다. */
+        defer {
+            selection = nil
+            isPreparing = false
+        }
+
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let image = UIImage.downsampled(from: data, maxPixel: Self.maxPixel)
+        else {
+            // 사진 앱이 바이트를 못 준 경우(iCloud 다운로드 실패 등). 세션이 문구를 갖는다.
+            session.failAvatarPreparation()
+            return
+        }
+        await session.uploadAvatar(image)
+    }
+}
+
+/* 아바타 + 카메라 배지. `AvatarPicker`의 프로퍼티로 두지 않고 타입으로 뺀 이유는 위
+ * `PhotosPicker` 호출부 주석에 있다 — 필요한 값을 전부 받아 두면 메인 액터 밖에서 만들 수 있다. */
+private struct PickerLabel: View {
+    let url: String?
+    let nickname: String?
+    let size: CGFloat
+    let isBusy: Bool
+    let palette: Palette
+
+    var body: some View {
         ZStack(alignment: .bottomTrailing) {
             AvatarView(url: url, nickname: nickname, size: size)
                 .opacity(isBusy ? 0.4 : 1)
@@ -66,24 +106,5 @@ struct AvatarPicker: View {
                     .tokenBorder(Circle(), color: palette.border)
             }
         }
-    }
-
-    private func upload(_ item: PhotosPickerItem) async {
-        isPreparing = true
-        /* 고른 항목을 비우는 것을 **먼저** 예약한다. 같은 사진을 다시 고르면 `selection`이
-         * 바뀌지 않아 `onChange`가 안 불린다 — 실패한 뒤 같은 사진으로 재시도하는 경로가 그렇다. */
-        defer {
-            selection = nil
-            isPreparing = false
-        }
-
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage.downsampled(from: data, maxPixel: Self.maxPixel)
-        else {
-            // 사진 앱이 바이트를 못 준 경우(iCloud 다운로드 실패 등). 세션이 문구를 갖는다.
-            await session.failAvatarPreparation()
-            return
-        }
-        await session.uploadAvatar(image)
     }
 }
