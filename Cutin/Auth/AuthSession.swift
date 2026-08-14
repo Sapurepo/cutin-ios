@@ -28,9 +28,31 @@ final class AuthSession {
         case restoring
         case signedOut
         case signedIn(UserProfile)
+
+        /// 지금 로그인한 사용자. `restoring`·`signedOut`에는 없다.
+        var userId: UUID? {
+            if case .signedIn(let profile) = self { return profile.id }
+            return nil
+        }
     }
 
-    private(set) var phase: Phase = .restoring
+    /* 계정이 바뀌면(로그아웃 · 다른 계정 로그인) 알린다. **누가 바뀌었는지 아는 곳은 여기뿐이다.**
+     *
+     * 화면 쪽에서 `onChange(of:)`로 지켜볼 수도 있지만, 그러면 SwiftUI가 그 값을 관찰하고
+     * 뷰를 다시 그려 주는지에 기대게 된다 — 앱 수명 스토어를 비우는 일이 뷰 갱신에 딸리면
+     * 안 된다. `didSet`은 값이 바뀌는 그 자리에서 부른다.
+     *
+     * 프로필만 바뀐 경우(닉네임·아바타 수정, 온보딩 완료)에는 `userId`가 같아 부르지 않는다. */
+    private(set) var phase: Phase = .restoring {
+        didSet {
+            guard oldValue.userId != phase.userId else { return }
+            onAccountChange?()
+        }
+    }
+
+    /* 계정이 바뀌었을 때 할 일. 세션이 스토어들을 직접 알지 않도록 클로저로 받는다 —
+     * `APIClient.setRefresher`와 같은 방향이다. 앱이 심는다(`CutinApp.init`). */
+    @ObservationIgnored var onAccountChange: (@MainActor () -> Void)?
 
     /// 서버에 계정 관련 요청을 보내는 중(로그인·온보딩). 버튼을 잠그고 표시를 바꾸는 데 쓴다.
     /// 두 화면은 `phase`로 갈려 동시에 뜨지 않으므로 깃발 하나로 충분하다.
@@ -52,10 +74,18 @@ final class AuthSession {
     }
 
     /// 로그인한 사용자의 id. "내 포스트인가"를 가르는 데 화면들이 쓴다.
-    var userId: UUID? {
-        if case .signedIn(let profile) = phase { return profile.id }
-        return nil
-    }
+    var userId: UUID? { phase.userId }
+
+    #if DEBUG
+        /* 검증 하니스 전용 — `Scripts/followups/`가 유일한 호출부다.
+         *
+         * `phase`를 움직이는 정상 경로는 로그인·로그아웃뿐이고 카카오 로그인은 사람이 눌러야
+         * 한다. 그렇다고 계정 변경 훅을 검증하지 않고 두면, 훅이 안 걸려도 통과하는 검사만
+         * 남는다(스토어를 비우는 `reset()`은 잘 도는데 아무도 부르지 않는 상태). */
+        func applyPhaseForTesting(_ phase: Phase) {
+            self.phase = phase
+        }
+    #endif
 
     // MARK: - 시작
 
