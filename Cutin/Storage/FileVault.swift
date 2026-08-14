@@ -55,19 +55,6 @@ struct FileVault: Sendable {
             .filter { $0.hasSuffix(".\(ext)") }
     }
 
-    /// 망가진 파일을 지우지 않고 옆으로 치운다 — 사용자 데이터를 버리지 않으려면 덮어쓰기 대신 이동.
-    /// 이름이 이미 있으면 그것도 남겨야 하므로 번호를 붙인다.
-    func moveAside(_ name: String, suffix: String) throws -> URL {
-        var destination = url("\(name).\(suffix)")
-        var attempt = 2
-        while FileManager.default.fileExists(atPath: destination.path) {
-            destination = url("\(name).\(suffix)-\(attempt)")
-            attempt += 1
-        }
-        try FileManager.default.moveItem(at: url(name), to: destination)
-        return destination
-    }
-
     /// 파일 생성 시각 — 인덱스를 잃었을 때 촬영 순서를 되살리는 유일한 단서.
     func creationDate(_ name: String) -> Date? {
         try? FileManager.default

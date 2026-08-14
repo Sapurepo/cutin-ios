@@ -20,24 +20,10 @@ enum CaptureMode: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 }
 
-/// 합성까지 끝나 로컬에 저장된 포스트.
-/// RN판 `Post`와 달리 **합성 결과 이미지 파일**을 실체로 가진다 — 두 스택의 핵심 차이.
-struct ComposedPost: Identifiable, Codable, Sendable {
-    let id: UUID
-    let createdAt: Date
-    /// Documents/Posts/ 하위 파일명
-    let imageFilename: String
-    /* 촬영 당시의 배치·외형을 **스냅샷으로** 들고 있는다. id만 남기면 서버가 템플릿이나
-     * 프레임을 고친 뒤 옛 포스트의 메타가 실제로 구워진 그림과 어긋난다. 서버도 같은 결론이라
-     * `postSchema`에 `template`·`frame` 객체를 실어 보낸다.
-     *
-     * 둘 다 옵셔널인 이유는 아래 `recoveredFromFile`이다 — 0.1.0은 복구 레코드에 `.four` 같은
-     * 자리값을 넣었는데, 모르는 값을 아는 척하는 것보다 없다고 말하는 편이 정직하다. */
-    let template: Template?
-    let frame: Frame?
-    let filterID: FilterID
-    var caption: String
-    /// 인덱스를 잃고 JPEG에서 되살린 레코드 표시. 이때 `template`·`frame`·`filterID`는
-    /// 인덱스에만 있던 값이라 복구되지 않는다 — 그 값을 진짜로 오해하지 않도록 파일에 흔적을 남긴다.
-    var recoveredFromFile: Bool?
-}
+/* 저장된 포스트(`ComposedPost`)는 없다. 서버가 포스트를 갖는다 — `Contracts.swift`의 `Post`다.
+ *
+ * 0.1.0은 합성 결과 JPEG와 `posts.json` 인덱스가 **원본**이었다. 이제 그것은 사본이고, 사본을
+ * 파일로 두면 "서버에서 지운 포스트가 기기에 남는다"를 새로 얻는다. 오프라인 피드는 범위 밖이다.
+ *
+ * 진행 중인 촬영(`DraftStore`)은 그대로 파일에 남는다 — 그건 이 기기의 상태이고 서버가
+ * 소유할 일이 없다. */
