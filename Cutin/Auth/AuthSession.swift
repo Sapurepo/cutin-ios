@@ -8,10 +8,17 @@
  * 만나면 이 객체를 거쳐 새 토큰을 받아 Keychain에 남긴다. 반대 방향(전송 계층이 Keychain을
  * 직접 아는 것)으로 두면 둘이 서로를 알게 된다.
  *
- * 온보딩(§3.1)도 여기 있다 — 이유는 `completeOnboarding` 위 주석 참조. */
+ * 온보딩(§3.1)과 프로필 수정(§3.4·§8.1)도 여기 있다. 셋 다 **로그인한 사용자 자신의 계정**을
+ * 다루고 결과가 `phase`의 프로필로 돌아오므로, 화면에 두면 프로필의 주인이 둘이 된다. */
 
-import Foundation
 import Observation
+import UIKit
+import os
+
+/* 실패한 오류 **자체**를 남긴다. 화면 문구는 카카오 SDK 오류를 "로그인에 실패했어요" 한 문장으로
+ * 뭉개므로(`message(for:)`의 default), 이것이 없으면 앱 키·번들 ID·동의항목 중 무엇이 틀렸는지
+ * 알 방법이 없다 — 재현해도 남는 것이 그 한 문장뿐이다. */
+private let authLog = Logger(subsystem: "com.sapurepo.cutin", category: "auth")
 
 @MainActor
 @Observable
@@ -105,6 +112,7 @@ final class AuthSession {
         } catch is CancellationError {
             // 로그인 창을 닫은 것. 오류로 보여주지 않는다.
         } catch {
+            authLog.error("카카오 로그인 실패: \(String(describing: error), privacy: .public)")
             failure = message(for: error)
         }
     }
@@ -156,6 +164,66 @@ final class AuthSession {
             }
             phase = .signedIn(try await client.send(
                 .post, "/users/me/onboarding/complete", as: UserProfile.self
+            ))
+        } catch {
+            failure = message(for: error)
+        }
+    }
+
+    // MARK: - 프로필 수정 (§3.4 · §8.1)
+
+    /* 온보딩을 마친 뒤 닉네임을 바꾼다(명세 §3.1 "변경은 추후 프로필에서").
+     * `completeOnboarding`과 같은 409 함정을 피해야 하므로 건너뛰기 조건이 여기도 있다. */
+    func updateNickname(_ nickname: String) async {
+        guard case .signedIn(let profile) = phase, profile.nickname != nickname else { return }
+        await patchProfile(UpdateMeBody(nickname: nickname))
+    }
+
+    /* 아바타 사진(§3.4). 왕복이 **넷**이다 — 업로드 셋(`MediaUploader`) + 프로필 PATCH.
+     *
+     * 화면이 아니라 여기서 이어 붙이는 이유는 `CaptureFlow.commit`과 같다: 중간에 화면이
+     *사라지면(탭 전환·시트 닫기) 남은 왕복이 죽은 화면의 상태에 쓰인다. 서버는 **ready이고
+     * kind가 avatar인 자기 미디어**만 프로필에 붙여 주므로(`MEDIA_NOT_READY`), 셋을 끝내기
+     * 전에 PATCH가 나가면 400이다.
+     *
+     * `UIKit`을 여기서 쓰는 대가로 그 순서를 한곳에 묶었다. */
+    func uploadAvatar(_ image: UIImage) async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        failure = nil
+        defer { isAuthenticating = false }
+
+        do {
+            let media = try await MediaUploader(client: client).upload(image, kind: .avatar)
+            phase = .signedIn(try await client.send(
+                .patch, "/users/me",
+                body: UpdateMeBody(avatarMediaId: .value(media.id)), as: UserProfile.self
+            ))
+        } catch {
+            failure = message(for: error)
+        }
+    }
+
+    /// 사진 앱이 바이트를 내주지 못했다(iCloud 다운로드 실패 등). 서버에 간 적이 없으므로
+    /// 서버 문구가 없고, 실패 표시는 다른 실패와 같은 자리에 있어야 한다.
+    func failAvatarPreparation() {
+        failure = "사진을 불러오지 못했어요. 다른 사진을 골라주세요"
+    }
+
+    /// 기본 이미지로 되돌린다. `null`을 실어야 지워지므로 `Field.null`이다 — 키를 빼면 "안 건드림"이다.
+    func removeAvatar() async {
+        await patchProfile(UpdateMeBody(avatarMediaId: .null))
+    }
+
+    private func patchProfile(_ body: UpdateMeBody) async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        failure = nil
+        defer { isAuthenticating = false }
+
+        do {
+            phase = .signedIn(try await client.send(
+                .patch, "/users/me", body: body, as: UserProfile.self
             ))
         } catch {
             failure = message(for: error)
@@ -218,7 +286,13 @@ final class AuthSession {
         case APIError.server(_, _, let message, _):
             return message
         default:
-            return "로그인에 실패했어요. 잠시 후 다시 시도해주세요"
+            /* 진단용 — 원인 확정 후 되돌린다. 이 분기는 카카오 SDK 오류·디코딩 실패를 한 문장으로
+             * 뭉개서, 실기기에서 재현해도 무엇이 틀렸는지 화면에 남지 않는다. */
+            #if DEBUG
+                return "로그인에 실패했어요. 잠시 후 다시 시도해주세요\n\n\(String(describing: error))"
+            #else
+                return "로그인에 실패했어요. 잠시 후 다시 시도해주세요"
+            #endif
         }
     }
 }

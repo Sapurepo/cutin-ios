@@ -7,15 +7,17 @@
  * 총 컷 수는 인덱스의 `count`를 합산한다. 인덱스를 잃고 복구된 레코드(`recoveredFromFile`)는
  * 컷 수가 자리값이라 합산에서 뺀다 — 모르는 값을 아는 척 더하면 통계가 거짓이 된다.
  *
- * 설정 진입(§8.3)은 두지 않는다 — 로그아웃·알림·약관 전부 서버가 생겨야 의미가 있는
- * 항목이라 0.1.0에는 열 화면이 없다. */
+ * 설정 진입(§8.3)은 두지 않는다 — 알림·약관은 아직 열 화면이 없다. 로그아웃만 헤더에 둔다.
+ *
+ * 닉네임·아바타는 **서버 프로필이 진실**이다. 0.1.0의 `ProfileStore`(UserDefaults 닉네임)를
+ * 지웠다 — 그 값은 서버에 간 적이 없어, 남겨 두면 화면과 서버가 다른 이름을 말한다. */
 
 import SwiftUI
 
 struct ProfileView: View {
     @Environment(FeedStore.self) private var store
     @Environment(ArchiveStore.self) private var archive
-    @Environment(ProfileStore.self) private var profile
+    @Environment(AuthSession.self) private var session
     @Environment(\.palette) private var palette
 
     @State private var isEditingNickname = false
@@ -48,7 +50,8 @@ struct ProfileView: View {
         .alert("닉네임", isPresented: $isEditingNickname) {
             TextField("닉네임", text: $nicknameDraft)
             Button("저장") {
-                profile.nickname = nicknameDraft.trimmingCharacters(in: .whitespaces)
+                let wanted = nicknameDraft.trimmingCharacters(in: .whitespaces)
+                Task { await session.updateNickname(wanted) }
             }
             Button("취소", role: .cancel) {}
         } message: {
@@ -58,25 +61,25 @@ struct ProfileView: View {
 
     // MARK: - 상단
 
+    /// 서버 프로필. 온보딩을 마쳐야 이 화면에 닿으므로 닉네임은 있지만, 계약상 null이 가능하다.
+    private var profile: UserProfile? {
+        if case .signedIn(let profile) = session.phase { return profile }
+        return nil
+    }
+
     private var header: some View {
         VStack(spacing: Spacing.x3) {
-            /* 이니셜 원형 아바타. PhotosPicker는 읽기 권한 키가 추가로 필요해 0.2.0.
-             * 서체는 본문 계열(Pretendard) — 이니셜은 보통 한글인데 Geist는 라틴 전용이라
-             * 한글에 걸면 시스템 폰트로 조용히 폴백해 바로 아래 숫자와 어긋난다. */
-            Text(profile.initial)
-                .font(Typography.font(.body, .semibold, size: 34))
-                .foregroundStyle(palette.accentOn)
-                .frame(width: 84, height: 84)
-                .background(palette.accent, in: .circle)
+            AvatarPicker(url: profile?.avatarUrl, nickname: profile?.nickname,
+                         allowsRemoval: true)
 
             Button {
-                nicknameDraft = profile.nickname
+                nicknameDraft = profile?.nickname ?? ""
                 isEditingNickname = true
             } label: {
                 HStack(spacing: Spacing.x1) {
-                    Text(profile.nickname.isEmpty ? "닉네임 정하기" : profile.nickname)
+                    Text(profile?.nickname ?? "닉네임 정하기")
                         .font(Typography.headline)
-                        .foregroundStyle(profile.nickname.isEmpty
+                        .foregroundStyle(profile?.nickname == nil
                                          ? palette.textSecondary : palette.textPrimary)
                     Image(systemName: "pencil")
                         .font(.system(size: 13, weight: .medium))
@@ -84,6 +87,13 @@ struct ProfileView: View {
                 }
             }
             .buttonStyle(.plain)
+
+            if let failure = session.failure {
+                Text(failure)
+                    .font(Typography.caption)
+                    .foregroundStyle(palette.danger)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 

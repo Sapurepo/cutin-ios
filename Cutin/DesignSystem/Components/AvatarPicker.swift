@@ -1,0 +1,89 @@
+/* 아바타 고르기 — 온보딩(§3.4)과 프로필(§8.1) 두 곳이 쓴다.
+ *
+ * `PhotosPicker`는 **사진 권한 키가 필요 없다.** 별도 프로세스에서 고르고 고른 것만 넘겨주므로
+ * `NSPhotoLibraryUsageDescription` 없이 동작한다(0.1.0에서 아바타를 미룬 이유가 "읽기 권한 키가
+ * 추가로 필요하다"였는데, 그 전제가 틀렸다).
+ *
+ * 올리는 일은 `AuthSession`이 한다 — 왕복이 넷(업로드 셋 + 프로필 PATCH)이라, 화면이 사라지면
+ * 남은 왕복이 죽은 상태에 쓰인다. 이 뷰는 고르고 줄이는 데까지만 한다. */
+
+import PhotosUI
+import SwiftUI
+
+struct AvatarPicker: View {
+    let url: String?
+    let nickname: String?
+    var size: CGFloat = 84
+    /// 사진 지우기를 허용할지. 온보딩에는 아직 지울 사진이 없다.
+    var allowsRemoval = false
+
+    @Environment(AuthSession.self) private var session
+    @Environment(\.palette) private var palette
+
+    @State private var selection: PhotosPickerItem?
+    @State private var isPreparing = false
+
+    /// 아바타 표시 크기(@3x)에 여유를 둔 값. 원본 12MP를 그대로 올릴 이유가 없다.
+    private static let maxPixel: CGFloat = 512
+
+    private var isBusy: Bool { isPreparing || session.isAuthenticating }
+
+    var body: some View {
+        VStack(spacing: Spacing.x2) {
+            PhotosPicker(selection: $selection, matching: .images) { label }
+                .buttonStyle(.plain)
+                .disabled(isBusy)
+
+            if allowsRemoval, url != nil, !isBusy {
+                Button("사진 지우기") { Task { await session.removeAvatar() } }
+                    .font(Typography.caption)
+                    .foregroundStyle(palette.textSecondary)
+            }
+        }
+        .onChange(of: selection) { _, item in
+            guard let item else { return }
+            Task { await upload(item) }
+        }
+    }
+
+    /* `PhotosPicker`의 label 클로저는 메인 액터가 아니라, 토큰 modifier를 그 안에서 부르면
+     * Swift 6가 격리 위반으로 막는다. 프로퍼티로 빼면 뷰의 격리를 그대로 물려받는다. */
+    private var label: some View {
+        ZStack(alignment: .bottomTrailing) {
+            AvatarView(url: url, nickname: nickname, size: size)
+                .opacity(isBusy ? 0.4 : 1)
+
+            if isBusy {
+                ProgressView().tint(palette.accentOn)
+                    .frame(width: size, height: size)
+            } else {
+                // 누를 수 있다는 표시. 없으면 그냥 그려진 원이라 아무도 누르지 않는다.
+                Image(systemName: "camera.fill")
+                    .font(.system(size: size * 0.16, weight: .semibold))
+                    .foregroundStyle(palette.textPrimary)
+                    .frame(width: size * 0.3, height: size * 0.3)
+                    .background(palette.surface, in: .circle)
+                    .tokenBorder(Circle(), color: palette.border)
+            }
+        }
+    }
+
+    private func upload(_ item: PhotosPickerItem) async {
+        isPreparing = true
+        /* 고른 항목을 비우는 것을 **먼저** 예약한다. 같은 사진을 다시 고르면 `selection`이
+         * 바뀌지 않아 `onChange`가 안 불린다 — 실패한 뒤 같은 사진으로 재시도하는 경로가 그렇다. */
+        defer {
+            selection = nil
+            isPreparing = false
+        }
+
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let image = UIImage.downsampled(from: data, maxPixel: Self.maxPixel)
+        else {
+            // 사진 앱이 바이트를 못 준 경우(iCloud 다운로드 실패 등). 세션이 문구를 갖는다.
+            await session.failAvatarPreparation()
+            return
+        }
+        await session.uploadAvatar(image)
+    }
+}

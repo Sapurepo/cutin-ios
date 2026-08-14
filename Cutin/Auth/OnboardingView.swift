@@ -1,16 +1,19 @@
-/* 온보딩 — 명세 §3. **닉네임 한 단계만** 만든다.
+/* 온보딩 — 명세 §3. **닉네임과 프로필 사진**만 만든다.
  *
  * §3은 다섯 단계(닉네임·친구목록·알림 슬롯·프로필 사진·팁 화면)를 적어 두었지만, 지금 만들 수
- * 있는 것은 하나뿐이다:
+ * 있는 것은 닉네임과 프로필 사진 둘뿐이다:
  *
  * - **§3.2 친구목록** — 명세에서 🔴(실현성 미확인)이고 서버에 연락처 매칭 경로가 없다.
  * - **§3.3 알림 슬롯** — 고르게 해도 알림이 가지 않는다(푸시 인프라 미정). 서버가 온보딩 완료
  *   시점에 기본 슬롯을 채우므로(`completeOnboarding`), 지키지 못할 약속을 화면에 만들지 않는다.
- * - **§3.4 프로필 사진** — 업로드 계층이 아직 없다. 다음 브랜치.
+ * - **§3.4 프로필 사진** — 넣었다. 업로드 계층이 생겼고, `PhotosPicker`는 사진 권한 키가
+ *   필요 없다(0.1.0에서 미룬 근거였던 "읽기 권한 키"는 사실이 아니었다). 건너뛸 수 있다 —
+ *   고르지 않으면 서버가 기본 아바타를 쓴다.
  * - **§3.5 팁 화면** — 보여줄 팁이 정해지지 않았다. 세 장을 지어내면 그게 곧 거짓말이다.
  *
- * 그래서 단계 표시(1/5 같은 것)도 두지 않았다. 한 단계뿐인 흐름에 진행 막대를 그리면 뒤에
- * 무언가 더 있는 것처럼 보인다.
+ * 그래서 단계 표시(1/5 같은 것)도 두지 않았다. 화면 하나로 끝나는 흐름에 진행 막대를 그리면
+ * 뒤에 무언가 더 있는 것처럼 보인다. 사진과 이름을 한 화면에 둔 것도 같은 이유다 — 사진 한 장
+ * 때문에 화면을 하나 더 만들면 "건너뛰기"라는 결정을 사용자에게 한 번 더 시킨다.
  *
  * ## 이 화면이 서버와 나누는 일
  *
@@ -40,7 +43,8 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
             heading
-            field.padding(.top, Spacing.x6)
+            avatar.padding(.top, Spacing.x6)
+            field.padding(.top, Spacing.x5)
             hintLine.padding(.top, Spacing.x2)
             Spacer()
             if let failure = session.failure { failureNotice(failure) }
@@ -66,6 +70,18 @@ struct OnboardingView: View {
                 .font(Typography.bodyText)
                 .foregroundStyle(palette.textSecondary)
         }
+    }
+
+    /* 사진은 선택이다. 안내 문구를 따로 달지 않았다 — 카메라 배지가 누를 수 있다는 표시이고,
+     * "건너뛸 수 있어요"를 적으면 필수인 줄 알았을 사람에게만 도움이 된다. */
+    private var avatar: some View {
+        AvatarPicker(url: avatarUrl, nickname: trimmed.isEmpty ? nil : trimmed)
+            .frame(maxWidth: .infinity)
+    }
+
+    private var avatarUrl: String? {
+        if case .signedIn(let profile) = session.phase { return profile.avatarUrl }
+        return nil
     }
 
     private var field: some View {
