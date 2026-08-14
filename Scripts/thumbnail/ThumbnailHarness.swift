@@ -1,0 +1,134 @@
+/* 임시 검증 하니스 — 앱 타깃에 넣어 한 번 돌리고 다시 뺀다.
+ *
+ * 대표 컷(§6.3)의 순수 함수 둘을 검사한다. 서버 왕복이 없어 스텁이 필요 없다
+ * (`Scripts/geometry`와 같은 방식).
+ *
+ *   ① `Post.gridImageURL` — **배열 위치가 아니라 `cutIndex`로** 찾는지. 계약이 컷 배열의
+ *      순서를 약속하지 않으므로, 서버가 순서를 바꿔 보내는 날 `cuts[n]`은 조용히 다른 컷을
+ *      그린다. 폴백 사다리(지정 → 첫 컷 → 합성본 → nil)도 함께 본다.
+ *   ② `Post.pinnedFirst` — 고정을 앞으로 보내되 **각 그룹 안의 서버 순서를 보존**하는지.
+ *      `sorted`로 짜면 Swift가 안정성을 보장하지 않아 발행 순서가 은근히 섞인다.
+ *
+ * 실행: SIMCTL_CHILD_THUMBNAIL_CHECK=1 로 앱을 띄우면 stdout에 결과를 뱉는다. 서명 불필요. */
+
+#if DEBUG
+import Foundation
+
+@MainActor
+enum ThumbnailHarness {
+    static var isRequested: Bool {
+        ProcessInfo.processInfo.environment["THUMBNAIL_CHECK"] == "1"
+    }
+
+    private static var failures = 0
+
+    static func run() {
+        checkGridImage()
+        checkPinnedFirst()
+        print("=== 결과: \(failures == 0 ? "전부 통과" : "실패 \(failures)건") ===")
+        fflush(stdout)
+        exit(failures == 0 ? 0 : 1)
+    }
+
+    // MARK: - ① gridImageURL
+
+    private static func checkGridImage() {
+        print("=== ① gridImageURL — cutIndex로 찾는다 ===")
+
+        /* 컷 배열을 **역순으로** 담는다. 배열 위치로 찾는 구현은 여기서 틀린 컷을 내놓는다 —
+         * 순서대로 담으면 두 구현이 같은 답을 내서 검사가 아무것도 가르지 못한다. */
+        let shuffled = post(cutIndexes: [3, 1, 0, 2], thumbnail: 2)
+        expect(shuffled.gridImageURL?.absoluteString == "https://cut/2",
+               "지정 인덱스를 cutIndex로 찾는다 (배열은 역순)",
+               shuffled.gridImageURL?.absoluteString ?? "nil")
+
+        let unspecified = post(cutIndexes: [3, 1, 0, 2], thumbnail: nil)
+        expect(unspecified.gridImageURL?.absoluteString == "https://cut/0",
+               "미지정이면 첫 컷(cutIndex 0) — 서버 기본과 같다",
+               unspecified.gridImageURL?.absoluteString ?? "nil")
+
+        // 지정 인덱스에 컷이 없다(계약 위반). 던지거나 비우지 않고 가장 앞 컷으로 내려간다.
+        let missing = post(cutIndexes: [1, 2], thumbnail: 7)
+        expect(missing.gridImageURL?.absoluteString == "https://cut/1",
+               "없는 인덱스 → 가장 앞 컷", missing.gridImageURL?.absoluteString ?? "nil")
+
+        let noCuts = post(cutIndexes: [], thumbnail: nil)
+        expect(noCuts.gridImageURL?.absoluteString == "https://composed",
+               "컷이 없으면 합성본", noCuts.gridImageURL?.absoluteString ?? "nil")
+
+        let bare = post(cutIndexes: [], thumbnail: nil, composed: false)
+        expect(bare.gridImageURL == nil, "아무것도 없으면 nil",
+               bare.gridImageURL?.absoluteString ?? "nil")
+
+        expect(post(cutIndexes: [0], thumbnail: 0).isPinned, "지정하면 고정")
+        expect(!post(cutIndexes: [0], thumbnail: nil).isPinned, "미지정은 고정이 아니다")
+    }
+
+    // MARK: - ② pinnedFirst
+
+    private static func checkPinnedFirst() {
+        print("=== ② pinnedFirst — 그룹 안 순서 보존 ===")
+
+        // 발행 순서: A(고정) B C(고정) D E(고정). 기대: A C E B D — 그룹 안은 그대로.
+        let mixed = [
+            post(name: "A", cutIndexes: [0], thumbnail: 0),
+            post(name: "B", cutIndexes: [0], thumbnail: nil),
+            post(name: "C", cutIndexes: [0], thumbnail: 0),
+            post(name: "D", cutIndexes: [0], thumbnail: nil),
+            post(name: "E", cutIndexes: [0], thumbnail: 0),
+        ]
+        let ordered = Post.pinnedFirst(mixed).map(\.caption)
+        expect(ordered == ["A", "C", "E", "B", "D"],
+               "고정 앞으로 + 그룹 안 발행 순서 보존", "\(ordered.map { $0 ?? "?" })")
+
+        expect(Post.pinnedFirst([]).isEmpty, "빈 목록")
+
+        let none = [post(name: "A", cutIndexes: [0], thumbnail: nil),
+                    post(name: "B", cutIndexes: [0], thumbnail: nil)]
+        expect(Post.pinnedFirst(none).map(\.caption) == ["A", "B"],
+               "고정이 없으면 그대로")
+
+        let all = [post(name: "A", cutIndexes: [0], thumbnail: 0),
+                   post(name: "B", cutIndexes: [0], thumbnail: 0)]
+        expect(Post.pinnedFirst(all).map(\.caption) == ["A", "B"],
+               "전부 고정이어도 순서 그대로 — 고정끼리는 발행 순이다")
+    }
+
+    // MARK: - 표본
+
+    private static func post(name: String = "P", cutIndexes: [Int], thumbnail: Int?,
+                             composed: Bool = true) -> Post {
+        let template = Template(id: UUID(), code: "grid4", name: "네 컷", cutCount: 4,
+                                aspectRatio: "1:1",
+                                slots: [TemplateSlot(x: 0, y: 0, width: 1, height: 1)])
+        return Post(
+            id: UUID(),
+            author: PostAuthor(id: UUID(), nickname: name, avatarUrl: nil),
+            template: template, frame: nil,
+            status: ServerEnum(.published), visibility: ServerEnum(.friends),
+            caption: name, thumbnailCutIndex: thumbnail,
+            cuts: cutIndexes.map { index in
+                PostCut(cutIndex: index, media: media(url: "https://cut/\(index)"))
+            },
+            composed: composed ? media(url: "https://composed") : nil,
+            publishedAt: "2026-08-14T00:00:00.000Z", createdAt: "2026-08-14T00:00:00.000Z",
+            commentCount: 0,
+            reactions: ReactionSummary(total: 0, counts: [], mine: nil),
+            bookmarked: false
+        )
+    }
+
+    private static func media(url: String) -> Media {
+        Media(id: UUID(), kind: ServerEnum(.cut), url: url, width: 100, height: 100)
+    }
+
+    private static func expect(_ passed: Bool, _ name: String, _ detail: String = "") {
+        if passed {
+            print("PASS  \(name)")
+        } else {
+            failures += 1
+            print("FAIL  \(name)\(detail.isEmpty ? "" : "  — \(detail)")")
+        }
+    }
+}
+#endif

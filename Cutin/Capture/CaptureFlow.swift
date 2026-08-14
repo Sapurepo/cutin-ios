@@ -128,6 +128,7 @@ final class CaptureFlow {
         cutsRevision += 1
         filterID = .original
         caption = ""
+        thumbnailCutIndex = nil
     }
 
     /// draft를 메모리로 되살린다. 컷 디코드가 12MP 여러 장이라 메인 액터 밖으로 보낸다.
@@ -220,6 +221,14 @@ final class CaptureFlow {
     /// 서버 기본값과 같은 `friends`로 시작한다 — 처음 쓰는 사람에게 전체 공개는 놀라운 기본값이다.
     var visibility: PostVisibility = .friends
 
+    /* 대표 컷(§6.3). nil이면 **미지정**이고 서버가 첫 컷을 기본으로 쓴다 — 그 구분이 화면 동작을
+     * 가른다: 직접 고른 포스트만 프로필 그리드 맨 앞에 고정된다(0.3.0 제품 결정).
+     * 그래서 기본값을 0으로 채우지 않는다 — 채우면 모든 포스트가 고정돼 고정이 무의미해진다.
+     *
+     * draft 파일에는 내리지 않는다 — `visibility`와 같은 결정이다(마무리 단계의 선택은
+     * 발행 직전 값이라 이어쓰기에서 다시 고르는 편이 안전하다). */
+    var thumbnailCutIndex: Int?
+
     enum CommitFailure: LocalizedError {
         /// 서버 템플릿 목록이 없어 그릴 배치가 없다.
         case templateMissing
@@ -248,6 +257,7 @@ final class CaptureFlow {
         let bakedCuts = cuts
         let bakedCaption = caption
         let bakedVisibility = visibility
+        let bakedThumbnail = thumbnailCutIndex
 
         let baked = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
@@ -260,7 +270,8 @@ final class CaptureFlow {
                 cuts: bakedCuts,
                 composed: baked,
                 caption: bakedCaption,
-                visibility: bakedVisibility
+                visibility: bakedVisibility,
+                thumbnailCutIndex: bakedThumbnail
             ))
             store.insertPublished(post)
             /* 포스트가 됐으니 draft는 더 이상 미완료가 아니다(§6.4 "업로드 완료 시 draft 해제").

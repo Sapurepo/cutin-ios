@@ -25,6 +25,7 @@ struct FinishStepView: View {
         VStack(spacing: Spacing.x5) {
             ComposePreview(flow: flow)
             captionField
+            thumbnailField
             visibilityField
             if let failure = flow.saveFailure { failureNotice(failure) }
 
@@ -65,6 +66,54 @@ struct FinishStepView: View {
                 .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
                 .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
         }
+    }
+
+    /* 대표 컷(§6.3). **안 골라도 된다** — 미지정이면 서버가 첫 컷을 기본으로 쓴다.
+     * 직접 고른 것과 기본의 구분이 실제 동작을 가른다: 고른 포스트만 프로필 그리드 맨 앞에
+     * 고정된다(0.3.0 제품 결정). 그래서 기본 선택을 채워 두지 않고, 고른 것을 다시 누르면
+     * 해제된다 — 고정을 무르는 길이 있어야 한다. */
+    private var thumbnailField: some View {
+        VStack(alignment: .leading, spacing: Spacing.x2) {
+            Text("대표 컷")
+                .font(Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+            HStack(spacing: Spacing.x2) {
+                ForEach(Array(flow.cuts.enumerated()), id: \.offset) { index, cut in
+                    thumbnailChoice(index: index, cut: cut)
+                }
+            }
+            Text(flow.thumbnailCutIndex == nil
+                 ? "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
+                 : "이 포스트가 프로필 맨 위에 고정돼요")
+                .font(Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+        }
+    }
+
+    private func thumbnailChoice(index: Int, cut: UIImage) -> some View {
+        let selected = flow.thumbnailCutIndex == index
+        return Button {
+            flow.thumbnailCutIndex = selected ? nil : index
+        } label: {
+            Image(uiImage: cut)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 52, height: 52)
+                .clipShape(.rect(cornerRadius: Radius.sm))
+                .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
+                             color: selected ? palette.accent : palette.border,
+                             lineWidth: selected ? 2 : 1)
+                .overlay(alignment: .topTrailing) {
+                    if selected {
+                        Image(systemName: "pin.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(palette.accent)
+                            .background(palette.bg, in: .circle)
+                            .offset(x: 4, y: -4)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var visibilityField: some View {

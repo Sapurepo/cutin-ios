@@ -36,7 +36,8 @@ struct ProfileView: View {
         session.userId.map(store.userList(id:)) ?? PostStore.List()
     }
 
-    private var posts: [Post] { list.ids.compactMap(store.post(id:)) }
+    /// 직접 지정한 대표 컷이 있는 포스트를 맨 앞에 고정한다(§6.3 · 0.3.0 제품 결정).
+    private var posts: [Post] { Post.pinnedFirst(list.ids.compactMap(store.post(id:))) }
 
     var body: some View {
         ScrollView {
