@@ -61,20 +61,33 @@ final class PostStore {
 
     // MARK: - 목록
 
-    /* 세 목록이 경로만 다르고 나머지가 같다. 키 경로로 받아 한 번만 쓴다 —
-     * 같은 코드를 셋으로 늘리면 페이징 버그도 셋이 된다. */
+    /* 목록들이 경로만 다르고 나머지가 같다. 한 번만 쓰고 **읽고 쓰는 법**을 받는다 —
+     * 같은 코드를 늘리면 페이징 버그도 같이 늘어난다.
+     *
+     * 키 경로가 아니라 접근자인 이유: 사용자별 목록은 `[UUID: List]` 사전이라 쓰기 가능한 키
+     * 경로를 만들 수 없다. 이전 판은 임시 프로퍼티(`scratch`)를 거쳤는데, 그 슬롯이 `await`를
+     * 넘어가며 공유돼 **`guard !isLoading` 중복 방지가 사용자별 목록에서만 무력화**됐다
+     * (초기 로드 중 pull-to-refresh면 두 요청이 같은 슬롯에 쓰고 나중 것이 이긴다).
+     * 접근자는 매번 실제 자리를 읽고 쓰므로 그 창이 없다. */
     private func load(
-        _ list: ReferenceWritableKeyPath<PostStore, List>,
         path: String,
-        refresh: Bool
+        refresh: Bool,
+        get: () -> List,
+        set: (List) -> Void
     ) async {
-        guard !self[keyPath: list].isLoading else { return }
-        if !refresh, !self[keyPath: list].canLoadMore, self[keyPath: list].hasLoaded { return }
+        guard !get().isLoading else { return }
+        if !refresh, !get().canLoadMore, get().hasLoaded { return }
 
-        let cursor = refresh ? nil : self[keyPath: list].nextCursor
-        self[keyPath: list].isLoading = true
-        self[keyPath: list].failure = nil
-        defer { self[keyPath: list].isLoading = false }
+        let cursor = refresh ? nil : get().nextCursor
+        var starting = get()
+        starting.isLoading = true
+        starting.failure = nil
+        set(starting)
+        defer {
+            var done = get()
+            done.isLoading = false
+            set(done)
+        }
 
         do {
             let page = try await client.send(
@@ -87,39 +100,40 @@ final class PostStore {
             /* 새로고침은 갈아끼우고, 더 받기는 뒤에 붙인다. 붙일 때 중복을 거르는 이유는
              * 커서 경계에서 같은 항목이 두 번 올 수 있기 때문이다 — `ForEach`가 같은 id를
              * 두 번 만나면 SwiftUI가 목록을 잘못 그린다. */
+            var updated = get()
             if refresh {
-                self[keyPath: list].ids = ids
+                updated.ids = ids
             } else {
-                let known = Set(self[keyPath: list].ids)
-                self[keyPath: list].ids += ids.filter { !known.contains($0) }
+                let known = Set(updated.ids)
+                updated.ids += ids.filter { !known.contains($0) }
             }
-            self[keyPath: list].nextCursor = page.nextCursor
-            self[keyPath: list].hasLoaded = true
+            updated.nextCursor = page.nextCursor
+            updated.hasLoaded = true
+            set(updated)
         } catch {
-            self[keyPath: list].failure = message(for: error)
+            var failed = get()
+            failed.failure = message(for: error)
+            set(failed)
         }
     }
 
     func loadFeed(refresh: Bool = false) async {
-        await load(\.feed, path: "/feed", refresh: refresh)
+        await load(path: "/feed", refresh: refresh,
+                   get: { self.feed }, set: { self.feed = $0 })
     }
 
     func loadBookmarks(refresh: Bool = false) async {
-        await load(\.bookmarks, path: "/users/me/bookmarks", refresh: refresh)
+        await load(path: "/users/me/bookmarks", refresh: refresh,
+                   get: { self.bookmarks }, set: { self.bookmarks = $0 })
     }
 
     func userList(id: UUID) -> List { userLists[id] ?? List() }
 
-    /* 사용자별 목록은 사전이라 키 경로를 쓸 수 없다. 같은 페이징을 두 번 쓰지 않으려고
-     * 임시 프로퍼티를 거쳐 `load`를 재사용한다 — 사전 항목에 직접 쓰는 키 경로를 만들 수 없어서다. */
+    /// 사용자별 포스트 목록. 내 프로필과 타인 프로필이 같은 경로를 쓴다.
     func loadUser(id: UUID, refresh: Bool = false) async {
-        scratch = userList(id: id)
-        await load(\.scratch, path: "/users/\(id.path)/posts", refresh: refresh)
-        userLists[id] = scratch
+        await load(path: "/users/\(id.path)/posts", refresh: refresh,
+                   get: { self.userList(id: id) }, set: { self.userLists[id] = $0 })
     }
-
-    /// `loadUser`가 잠깐 쓰는 자리. 목록 하나씩만 불러오므로 겹치지 않는다.
-    @ObservationIgnored private var scratch = List()
 
     // MARK: - 한 건
 
@@ -142,40 +156,38 @@ final class PostStore {
      * 두 기기에서 같은 포스트를 눌렀을 때 짐작이 어긋난다.
      *
      * 보관 목록은 갱신하지 않고 **다음에 열 때 다시 받는다.** 커서 키가 "보관한 시각"이라
-     * 중간에 끼워 넣으면 서버가 줄 순서와 달라진다. */
-    func toggleBookmark(id: UUID) async {
+     * 중간에 끼워 넣으면 서버가 줄 순서와 달라진다.
+     *
+     * 실패를 목록의 `failure`에 담지 않고 **던진다.** 담아 봐야 `PostList`는 목록이 비었을 때만
+     * 그 문구를 그리므로, 포스트가 있는 화면에서 보관을 눌러 실패하면 아무 일도 일어나지
+     * 않는다 — 사용자에게는 버튼이 고장난 것으로 보인다. 부른 화면이 자기 자리에 쓴다. */
+    func toggleBookmark(id: UUID) async throws {
         guard let post = posts[id] else { return }
         let wanted = !post.bookmarked
-        do {
-            let result = try await client.send(
-                wanted ? .put : .delete, "/posts/\(id.path)/bookmark",
-                as: BookmarkResult.self
-            )
-            posts[id] = post.replacing(bookmarked: result.bookmarked)
-            bookmarks.invalidate()
-        } catch {
-            feed.failure = message(for: error)
-        }
+        let result = try await client.send(
+            wanted ? .put : .delete, "/posts/\(id.path)/bookmark",
+            as: BookmarkResult.self
+        )
+        posts[id] = post.replacing(bookmarked: result.bookmarked)
+        bookmarks.invalidate()
     }
 
     /* 반응(§7.3). 서버가 **바뀐 요약 전체**를 돌려주므로 앱이 수치를 더하고 빼지 않는다 —
      * 같은 포스트에 여러 사람이 동시에 반응하면 손으로 센 값은 금세 어긋난다.
      *
      * 같은 반응을 다시 누르면 취소(`DELETE`), 다른 반응이면 교체(`PUT`)다. 교체를 위해 먼저
-     * 지울 필요가 없다 — 서버가 `PUT` 하나로 토글과 교체를 함께 처리한다. */
-    func react(id: UUID, type: ReactionType) async {
+     * 지울 필요가 없다 — 서버가 `PUT` 하나로 토글과 교체를 함께 처리한다.
+     *
+     * 실패는 `toggleBookmark`와 같은 이유로 던진다. */
+    func react(id: UUID, type: ReactionType) async throws {
         guard let post = posts[id] else { return }
         let isCancel = post.reactions.mine?.known == type
-        do {
-            let summary: ReactionSummary = try await client.send(
-                isCancel ? .delete : .put, "/posts/\(id.path)/reaction",
-                body: isCancel ? nil : PutReactionBody(type: ServerEnum(type)),
-                as: ReactionSummary.self
-            )
-            posts[id] = post.replacing(reactions: summary)
-        } catch {
-            feed.failure = message(for: error)
-        }
+        let summary: ReactionSummary = try await client.send(
+            isCancel ? .delete : .put, "/posts/\(id.path)/reaction",
+            body: isCancel ? nil : PutReactionBody(type: ServerEnum(type)),
+            as: ReactionSummary.self
+        )
+        posts[id] = post.replacing(reactions: summary)
     }
 
     /// 삭제. 서버가 soft delete라 목록에서도 빠진다.
@@ -220,6 +232,15 @@ final class PostStore {
             userLists[post.author.id]?.ids.removeAll { $0 == post.id }
             userLists[post.author.id]?.ids.insert(post.id, at: 0)
         }
+    }
+
+    /* 계정이 바뀌었다. 받아 둔 것은 전부 이전 계정의 것이므로 버린다 —
+     * **커서와 `hasLoaded`까지** 비워야 다음 계정이 처음부터 받는다(`CutinApp` 주석 참고). */
+    func reset() {
+        posts = [:]
+        feed = List()
+        bookmarks = List()
+        userLists = [:]
     }
 
     private func message(for error: any Error) -> String {
