@@ -7,7 +7,12 @@ import UIKit
 @MainActor
 @Observable
 final class CaptureFlow {
-    private(set) var count: CutCount = .four
+    /* 목표 컷 수는 **선택한 서버 템플릿이 정한다.** 0.1.0은 `CutCount` 열거형이었는데,
+     * 서버 컨트롤러가 "클라이언트가 컷 수를 가정하지 않는다"고 못박아 두었다.
+     * 템플릿이 없으면(목록 도착 전) 촬영을 시작할 수 없으므로 0이 안전한 초기값이다. */
+    private(set) var template: Template?
+    /// 합성 외형. 서버 목록의 첫 항목이 기본값이다(`TemplateCatalog.defaultFrame`).
+    var frame: Frame?
     private(set) var mode: CaptureMode = .burst
     private(set) var cuts: [UIImage] = []
     /// nil이 아니면 "그 인덱스를 다시 찍는 중"
@@ -16,7 +21,6 @@ final class CaptureFlow {
     /* 편집 선택도 플로우가 갖는다. 편집이 한 화면이던 동안은 ComposeView의 `@State`로 충분했지만,
      * 템플릿·보정·마무리 세 화면으로 나뉘면 뒤로 넘길 때 그 화면의 상태가 사라져 선택이 초기화된다.
      * draft 영속(§5.3)도 이 값들을 파일로 내려야 하므로 소유자는 화면이 아니라 플로우여야 한다. */
-    var templateID: String = Templates.all[0].id
     var filterID: FilterID = .original
     var caption = ""
 
@@ -24,11 +28,11 @@ final class CaptureFlow {
      * 컷 수만 보는 미리보기는 카메라로 돌아가 다시 찍고 와도 옛 그림을 그대로 둔다. */
     private(set) var cutsRevision = 0
 
-    var template: CaptureTemplate { Templates.find(templateID) }
+    var cutCount: Int { template?.cutCount ?? 0 }
 
-    var isComplete: Bool { cuts.count >= count.rawValue && retakeIndex == nil }
+    var isComplete: Bool { cutCount > 0 && cuts.count >= cutCount && retakeIndex == nil }
     /// 다음에 채울 컷의 1-based 번호 (표시용)
-    var nextSlot: Int { min(cuts.count + 1, count.rawValue) }
+    var nextSlot: Int { min(cuts.count + 1, max(cutCount, 1)) }
 
     // MARK: - draft (§5.3)
 
@@ -61,12 +65,21 @@ final class CaptureFlow {
         draft = drafts.load()
     }
 
-    func configure(count: CutCount, mode: CaptureMode) {
-        self.count = count
+    func configure(template: Template, frame: Frame?, mode: CaptureMode) {
+        self.template = template
+        self.frame = frame
         self.mode = mode
         /* 새 촬영은 이전 draft를 지우고 시작한다. 남겨 두면 컷 수가 줄었을 때(4컷 → 2컷)
          * 옛 `cut-2.jpg`가 살아남아 복구가 있지도 않은 컷을 되살린다. */
         discardDraft()
+    }
+
+    /* 편집 중 배치 변경. **컷 수가 같은 템플릿만 받는다** — 이미 찍은 컷이 있는 상태에서
+     * 컷 수가 다른 템플릿으로 갈아타면 빈 슬롯이 생기거나 찍은 컷이 잘려 나간다.
+     * 편집 화면은 같은 컷 수만 보여주므로 정상 경로에서는 거부가 일어나지 않는다. */
+    func select(template: Template) {
+        guard template.cutCount == cutCount else { return }
+        self.template = template
     }
 
     /// 재촬영 중이면 해당 슬롯을 교체하고, 아니면 뒤에 붙인다.
@@ -76,7 +89,7 @@ final class CaptureFlow {
             cuts[index] = image
             retakeIndex = nil
             slot = index
-        } else if cuts.count < count.rawValue {
+        } else if cuts.count < cutCount {
             cuts.append(image)
             slot = cuts.count - 1
         } else {
@@ -106,12 +119,13 @@ final class CaptureFlow {
         draft = nil
     }
 
+    /* 컷과 편집 선택을 비운다. **템플릿·프레임은 건드리지 않는다** — 0.1.0은 여기서
+     * 템플릿을 컷 수에 맞는 기본값으로 되돌렸는데, 컷 수 자체가 템플릿에서 나오는 지금
+     * 그렇게 하면 방금 `configure`로 정한 선택을 지운다. 새 촬영의 템플릿은 호출부가 정한다. */
     private func wipe() {
         cuts = []
         retakeIndex = nil
         cutsRevision += 1
-        // 컷 수가 바뀌면 이전 템플릿이 그 컷 수를 지원하지 않을 수 있다(스트립 계열은 4컷 전용).
-        templateID = Templates.forCount(count).first?.id ?? Templates.all[0].id
         filterID = .original
         caption = ""
     }
@@ -130,9 +144,9 @@ final class CaptureFlow {
             return false
         }
 
-        count = draft.count
+        template = draft.template
+        frame = draft.frame
         mode = draft.mode
-        templateID = draft.templateID
         filterID = draft.filterID
         caption = draft.caption
         cuts = loaded
@@ -158,10 +172,10 @@ final class CaptureFlow {
         // 24h 시계는 첫 컷에서 시작한다 — 그 전에는 지킬 것이 없다.
         let snapshot = DraftStore.Draft(
             createdAt: draft?.createdAt ?? Date(),
-            count: count,
             mode: mode,
             cutCount: cuts.count,
-            templateID: templateID,
+            template: template,
+            frame: frame,
             filterID: filterID,
             caption: caption
         )
@@ -176,60 +190,79 @@ final class CaptureFlow {
         }.value
     }
 
-    /// 미리보기와 저장이 **같은 입력**을 쓰도록 요청 생성을 한곳에 둔다.
-    /// 폭만 다르게 불러 화면용과 파일용을 굽는다.
-    func compositionRequest(outputWidth: CGFloat) -> CompositionRequest {
-        CompositionRequest(
+    /* 미리보기와 저장이 **같은 입력**을 쓰도록 요청 생성을 한곳에 둔다.
+     * 폭만 다르게 불러 화면용과 파일용을 굽는다.
+     *
+     * 템플릿이나 프레임이 없으면 nil이다 — 서버 목록이 오기 전에는 그릴 배치가 없다.
+     * 로컬 기본값으로 대신 그리면 목록이 도착한 뒤 그림이 바뀐다. */
+    func compositionRequest(outputWidth: CGFloat) -> CompositionRequest? {
+        guard let template, let frame else { return nil }
+        return CompositionRequest(
             images: cuts,
-            count: count,
-            layout: template.layout,
-            skin: template.frame,
+            template: template,
+            frame: frame,
             filter: filterID,
             stampDate: Date(),
             outputWidth: outputWidth
         )
     }
 
-    // MARK: - 커밋
+    // MARK: - 발행
 
-    /* 저장 진행 상태를 화면이 아니라 플로우가 갖는다.
+    /* 발행 진행 상태를 화면이 아니라 플로우가 갖는다.
      *
      * 마무리 화면의 `@State`로 두면 저장을 누른 뒤 뒤로 갔다 다시 들어올 때 새 화면이
      * 만들어지면서 "저장 중"이 초기화된다. 그 상태에서 다시 누르면 **한 번의 촬영이 두 번
-     * 저장돼** JPEG도 포스트도 둘이 된다. 실패 문구도 같은 이유로 죽은 화면에 쓰여 사라진다. */
-    private(set) var isSaving = false
+     * 올라간다.** 실패 문구도 같은 이유로 죽은 화면에 쓰여 사라진다. */
     private(set) var saveFailure: Error?
 
-    /// 합성 결과를 파일로 남긴다. 성공하면 true.
-    func commit(to store: FeedStore) async -> Bool {
-        guard !isSaving else { return false }
-        isSaving = true
-        saveFailure = nil
-        defer { isSaving = false }
+    /// 공개 범위(§6.4). 0.1.0에는 저장할 곳이 없어 UI를 만들지 않았다.
+    /// 서버 기본값과 같은 `friends`로 시작한다 — 처음 쓰는 사람에게 전체 공개는 놀라운 기본값이다.
+    var visibility: PostVisibility = .friends
 
-        /* 메타데이터를 **굽기 전에** 붙잡는다. 렌더는 200ms대가 걸리고 그 사이 사용자는
-         * 뒤로 가 보정을 바꾸거나 캡션을 더 칠 수 있다. 나중에 읽으면 파일은 옛 선택으로
-         * 구워졌는데 인덱스에는 새 선택이 적혀, 목록과 그림이 서로 다른 말을 한다. */
-        let request = compositionRequest(outputWidth: CutCompositor.saveWidth)
-        let bakedCount = count
-        let bakedLayout = template.layout
-        let bakedFrameID = template.frame.id
-        let bakedFilterID = filterID
+    enum CommitFailure: LocalizedError {
+        /// 서버 템플릿 목록이 없어 그릴 배치가 없다.
+        case templateMissing
+
+        var errorDescription: String? {
+            "템플릿을 불러오지 못해 저장할 수 없어요. 잠시 후 다시 시도해주세요"
+        }
+    }
+
+    /* 합성해서 서버에 발행한다. 성공하면 발행된 포스트.
+     *
+     * 0.1.0은 여기서 파일 하나를 쓰고 끝났다. 지금은 왕복이 컷 수에 따라 열여섯 번쯤 되고
+     * (`PostPublisher`), 그 순서와 진행 표시는 전부 발행기가 갖는다. 이 메서드가 하는 일은
+     * **굽기 전에 메타데이터를 붙잡는 것**뿐이다 — 렌더는 200ms대가 걸리고 그 사이 사용자가
+     * 뒤로 가 보정을 바꾸면, 올라간 그림과 올라간 캡션이 서로 다른 순간의 것이 된다. */
+    func commit(with publisher: PostPublisher, to store: PostStore) async -> Bool {
+        guard !publisher.isPublishing else { return false }
+        saveFailure = nil
+
+        guard let request = compositionRequest(outputWidth: CutCompositor.saveWidth),
+              let template, let frame
+        else {
+            saveFailure = CommitFailure.templateMissing
+            return false
+        }
+        let bakedCuts = cuts
         let bakedCaption = caption
+        let bakedVisibility = visibility
 
         let baked = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
         }.value
 
         do {
-            try store.save(
-                image: baked,
-                count: bakedCount,
-                layout: bakedLayout,
-                frameID: bakedFrameID,
-                filterID: bakedFilterID,
-                caption: bakedCaption
-            )
+            let post = try await publisher.publish(PostPublisher.Request(
+                template: template,
+                frame: frame,
+                cuts: bakedCuts,
+                composed: baked,
+                caption: bakedCaption,
+                visibility: bakedVisibility
+            ))
+            store.insertPublished(post)
             /* 포스트가 됐으니 draft는 더 이상 미완료가 아니다(§6.4 "업로드 완료 시 draft 해제").
              * 여기서 지우지 않으면 다음 촬영이 이미 저장된 촬영에 막힌다. */
             discardDraft()
