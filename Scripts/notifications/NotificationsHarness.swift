@@ -160,6 +160,10 @@ enum NotificationsHarness {
         // 토큰은 16진 문자열이어야 한다 — base64나 Data 설명 문자열을 보내면 서버가 못 쓴다.
         check("토큰을 16진으로 보냈다", body["pushToken"] as? String == "deadbeef")
         check("플랫폼은 ios", body["platform"] as? String == "ios")
+        /* 서버가 필수로 요구하는 값이다 — 빠지면 400이고 등록이 조용히 실패한다.
+         * 하니스는 시뮬레이터에서 도니 sandbox여야 한다. */
+        check("환경을 실었다 — 시뮬레이터는 sandbox",
+              body["pushEnvironment"] as? String == "sandbox")
         check("기기 타임존을 실었다",
               body["timezone"] as? String == TimeZone.current.identifier)
 
