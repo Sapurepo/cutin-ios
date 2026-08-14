@@ -102,6 +102,16 @@ struct TokensResponse: Decodable, Sendable {
     let expiresIn: Int
 }
 
+/* 경로에 실을 식별자 표기.
+ *
+ * `UUID.uuidString`은 **대문자**를 낸다. 서버는 정규형(소문자)으로 주고, postgres의 `uuid`
+ * 컬럼은 둘 다 받으므로 지금은 어느 쪽이든 붙는다. 그래도 서버가 준 표기로 되돌려 보내는 편이
+ * 맞다 — 로그·캐시 키가 서버와 같아지고, uuid 컬럼이 아닌 식별자(스토리지 키 등)가 경로에
+ * 들어오는 날 조용히 깨지지 않는다. */
+extension UUID {
+    var path: String { uuidString.lowercased() }
+}
+
 // MARK: - 사용자
 
 struct UserProfile: Decodable, Sendable, Equatable {
