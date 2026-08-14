@@ -7,9 +7,9 @@
  * `actor`인 이유는 액세스 토큰이 가변 상태이기 때문이다. 요청은 여러 화면에서 동시에 나가고
  * 토큰은 재발급으로 바뀐다 — `@MainActor`로 두면 네트워크 대기가 메인 액터를 잡는다.
  *
- * **토큰 재발급은 여기 없다.** 401을 `APIError.isUnauthorized`로 드러내기만 한다. 재발급은
- * 리프레시 토큰 보관(Keychain)과 동시 401의 직렬화가 필요해 인증 브랜치의 몫이다 —
- * 보관소 없이 재발급을 쓰면 재발급된 토큰을 저장할 곳이 없다. */
+ * 401을 만나면 **한 번** 재발급하고 같은 요청을 재시도한다. 재발급 자체는 여기서 하지 않고
+ * `refresher`로 주입받는다 — 리프레시 토큰을 Keychain에 넣고 꺼내는 일은 세션의 몫이고,
+ * 전송 계층이 보관소를 알면 둘이 서로를 알게 된다. */
 
 import Foundation
 
@@ -26,6 +26,15 @@ actor APIClient {
     private let session: URLSession
     private var accessToken: String?
 
+    /* 401을 받았을 때 새 액세스 토큰을 얻어 오는 일. 세션이 심는다.
+     * nil이면 재발급을 시도하지 않고 401을 그대로 올린다 — 로그인 전 상태다. */
+    private var refresher: (@Sendable () async throws -> String)?
+
+    /* 진행 중인 재발급. 동시에 401을 맞은 요청들이 각자 재발급을 부르면 리프레시 토큰이
+     * 여러 번 쓰이고, 서버가 회전(rotation)을 한다면 뒤늦은 것들이 폐기된 토큰으로 실패한다.
+     * 첫 요청이 만든 작업을 나머지가 기다린다. */
+    private var refreshTask: Task<String, any Error>?
+
     init(baseURL: URL = APIConfig.baseURL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
@@ -33,6 +42,10 @@ actor APIClient {
 
     func setAccessToken(_ token: String?) {
         accessToken = token
+    }
+
+    func setRefresher(_ refresher: (@Sendable () async throws -> String)?) {
+        self.refresher = refresher
     }
 
     // MARK: - 보내기
@@ -67,7 +80,42 @@ actor APIClient {
 
     // MARK: - 내부
 
+    /* 401이면 재발급 후 **한 번만** 재시도한다. 무한히 돌지 않게 하는 것이 `isRetry`의 전부다 —
+     * 재발급이 성공했는데도 다시 401이 오는 경우(권한이 아예 없는 리소스, 서버 버그)에
+     * 재발급 요청이 끝없이 나가는 것을 막는다. */
     private func perform(
+        _ method: Method,
+        _ path: String,
+        query: [String: String],
+        body: (any Encodable & Sendable)?,
+        authorized: Bool
+    ) async throws -> Data {
+        do {
+            return try await attempt(method, path, query: query, body: body, authorized: authorized)
+        } catch let error as APIError where error.isUnauthorized && authorized && refresher != nil {
+            accessToken = try await refreshedToken()
+            return try await attempt(method, path, query: query, body: body, authorized: authorized)
+        }
+    }
+
+    /// 진행 중인 재발급이 있으면 그것을 기다린다.
+    private func refreshedToken() async throws -> String {
+        if let refreshTask {
+            return try await refreshTask.value
+        }
+        guard let refresher else {
+            throw APIError.server(
+                status: 401, code: APIError.Code.unauthorized.rawValue,
+                message: "로그인이 필요합니다.", details: nil
+            )
+        }
+        let task = Task { try await refresher() }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
+
+    private func attempt(
         _ method: Method,
         _ path: String,
         query: [String: String],

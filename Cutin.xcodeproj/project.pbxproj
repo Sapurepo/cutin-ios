@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C0710300000000000000D005 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = C0710300000000000000D002 /* KakaoSDKCommon */; };
+		C0710300000000000000D006 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C0710300000000000000D003 /* KakaoSDKAuth */; };
+		C0710300000000000000D007 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = C0710300000000000000D004 /* KakaoSDKUser */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		C0710300000000000000A004 /* Cutin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutin.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0710300000000000000C001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
@@ -22,6 +28,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0710300000000000000D005 /* KakaoSDKCommon in Frameworks */,
+				C0710300000000000000D006 /* KakaoSDKAuth in Frameworks */,
+				C0710300000000000000D007 /* KakaoSDKUser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +84,9 @@
 			);
 			name = Cutin;
 			packageProductDependencies = (
+				C0710300000000000000D002 /* KakaoSDKCommon */,
+				C0710300000000000000D003 /* KakaoSDKAuth */,
+				C0710300000000000000D004 /* KakaoSDKUser */,
 			);
 			productName = Cutin;
 			productReference = C0710300000000000000A004 /* Cutin.app */;
@@ -105,6 +117,9 @@
 			mainGroup = C0710300000000000000A002;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+			);
 			productRefGroup = C0710300000000000000A003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -205,6 +220,35 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kakao/kakao-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C0710300000000000000D002 /* KakaoSDKCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKCommon;
+		};
+		C0710300000000000000D003 /* KakaoSDKAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKAuth;
+		};
+		C0710300000000000000D004 /* KakaoSDKUser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKUser;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		C0710300000000000000B001 /* Build configuration list for PBXProject "Cutin" */ = {

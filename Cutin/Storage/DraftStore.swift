@@ -19,13 +19,19 @@ struct DraftStore: Sendable {
     struct Draft: Codable, Sendable {
         /// 첫 컷을 찍은 시각. 24h 만료의 기준이다.
         var createdAt: Date
-        var count: CutCount
         var mode: CaptureMode
         /// 실제로 찍힌 컷 수. 읽을 때 파일 수와 맞춰 줄인다.
         var cutCount: Int
-        var templateID: String
+        /* 목표 컷 수와 배치·외형은 **서버 템플릿 스냅샷으로** 담는다. id만 남기면 이어쓸 때
+         * 목록을 다시 받아 조회해야 하고, 그 사이 서버가 템플릿을 바꾸면 이미 찍은 컷 수와
+         * 어긋난다. 서버 draft도 `postSchema.template`에 객체를 싣는다. */
+        var template: Template?
+        var frame: Frame?
         var filterID: FilterID
         var caption: String
+
+        /// 이 촬영이 목표한 컷 수. 템플릿을 잃은 옛 draft는 찍힌 수를 목표로 본다.
+        var targetCutCount: Int { template?.cutCount ?? cutCount }
     }
 
     /// 24h(§5.3 확정). 만료는 **읽는 시점**에 판정한다 — 로컬 전용 단계에서는 앱이 꺼져 있는 동안
