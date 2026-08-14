@@ -790,7 +790,7 @@
     },
     "/frames": {
       "get": {
-        "description": "컷 그리드를 감싸는 외형이다. 길이 값은 캔버스 폭 대비 비율이라 출력 해상도와 무관하다.",
+        "description": "컷 그리드를 감싸는 외형이다. 길이 값은 캔버스 폭 대비 비율이라 출력 해상도와 무관하다. 노출 순서대로 내려가며 첫 항목이 기본 외형이다 — 포스트의 frame이 null일 때 이 값으로 그린다.",
         "operationId": "PostsController_listFrames",
         "parameters": [],
         "responses": {
@@ -3593,6 +3593,7 @@
               "footer"
             ],
             "additionalProperties": false,
+            "description": "외형을 고르지 않았으면 null이다. 서버가 기본 외형으로 대신 채우지 않는다 — GET /frames의 첫 항목이 기본이다.",
             "nullable": true
           },
           "status": {
@@ -3963,6 +3964,7 @@
                     "footer"
                   ],
                   "additionalProperties": false,
+                  "description": "외형을 고르지 않았으면 null이다. 서버가 기본 외형으로 대신 채우지 않는다 — GET /frames의 첫 항목이 기본이다.",
                   "nullable": true
                 },
                 "status": {
@@ -4238,6 +4240,7 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "null은 선택 해제다. 기본 외형으로 치환되지 않고 미선택 상태가 된다.",
             "nullable": true
           },
           "cuts": {
