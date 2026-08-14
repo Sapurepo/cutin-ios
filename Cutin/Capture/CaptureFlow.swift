@@ -207,15 +207,18 @@ final class CaptureFlow {
         )
     }
 
-    // MARK: - 커밋
+    // MARK: - 발행
 
-    /* 저장 진행 상태를 화면이 아니라 플로우가 갖는다.
+    /* 발행 진행 상태를 화면이 아니라 플로우가 갖는다.
      *
      * 마무리 화면의 `@State`로 두면 저장을 누른 뒤 뒤로 갔다 다시 들어올 때 새 화면이
      * 만들어지면서 "저장 중"이 초기화된다. 그 상태에서 다시 누르면 **한 번의 촬영이 두 번
-     * 저장돼** JPEG도 포스트도 둘이 된다. 실패 문구도 같은 이유로 죽은 화면에 쓰여 사라진다. */
-    private(set) var isSaving = false
+     * 올라간다.** 실패 문구도 같은 이유로 죽은 화면에 쓰여 사라진다. */
     private(set) var saveFailure: Error?
+
+    /// 공개 범위(§6.4). 0.1.0에는 저장할 곳이 없어 UI를 만들지 않았다.
+    /// 서버 기본값과 같은 `friends`로 시작한다 — 처음 쓰는 사람에게 전체 공개는 놀라운 기본값이다.
+    var visibility: PostVisibility = .friends
 
     enum CommitFailure: LocalizedError {
         /// 서버 템플릿 목록이 없어 그릴 배치가 없다.
@@ -226,37 +229,40 @@ final class CaptureFlow {
         }
     }
 
-    /// 합성 결과를 파일로 남긴다. 성공하면 true.
-    func commit(to store: FeedStore) async -> Bool {
-        guard !isSaving else { return false }
-        isSaving = true
+    /* 합성해서 서버에 발행한다. 성공하면 발행된 포스트.
+     *
+     * 0.1.0은 여기서 파일 하나를 쓰고 끝났다. 지금은 왕복이 컷 수에 따라 열여섯 번쯤 되고
+     * (`PostPublisher`), 그 순서와 진행 표시는 전부 발행기가 갖는다. 이 메서드가 하는 일은
+     * **굽기 전에 메타데이터를 붙잡는 것**뿐이다 — 렌더는 200ms대가 걸리고 그 사이 사용자가
+     * 뒤로 가 보정을 바꾸면, 올라간 그림과 올라간 캡션이 서로 다른 순간의 것이 된다. */
+    func commit(with publisher: PostPublisher, to store: PostStore) async -> Bool {
+        guard !publisher.isPublishing else { return false }
         saveFailure = nil
-        defer { isSaving = false }
 
-        /* 메타데이터를 **굽기 전에** 붙잡는다. 렌더는 200ms대가 걸리고 그 사이 사용자는
-         * 뒤로 가 보정을 바꾸거나 캡션을 더 칠 수 있다. 나중에 읽으면 파일은 옛 선택으로
-         * 구워졌는데 인덱스에는 새 선택이 적혀, 목록과 그림이 서로 다른 말을 한다. */
-        guard let request = compositionRequest(outputWidth: CutCompositor.saveWidth) else {
+        guard let request = compositionRequest(outputWidth: CutCompositor.saveWidth),
+              let template, let frame
+        else {
             saveFailure = CommitFailure.templateMissing
             return false
         }
-        let bakedTemplate = template
-        let bakedFrame = frame
-        let bakedFilterID = filterID
+        let bakedCuts = cuts
         let bakedCaption = caption
+        let bakedVisibility = visibility
 
         let baked = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
         }.value
 
         do {
-            try store.save(
-                image: baked,
-                template: bakedTemplate,
-                frame: bakedFrame,
-                filterID: bakedFilterID,
-                caption: bakedCaption
-            )
+            let post = try await publisher.publish(PostPublisher.Request(
+                template: template,
+                frame: frame,
+                cuts: bakedCuts,
+                composed: baked,
+                caption: bakedCaption,
+                visibility: bakedVisibility
+            ))
+            store.insertPublished(post)
             /* 포스트가 됐으니 draft는 더 이상 미완료가 아니다(§6.4 "업로드 완료 시 draft 해제").
              * 여기서 지우지 않으면 다음 촬영이 이미 저장된 촬영에 막힌다. */
             discardDraft()
