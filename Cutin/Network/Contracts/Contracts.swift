@@ -57,7 +57,7 @@ enum PostVisibility: String, Sendable, Hashable, CaseIterable {
     case friends, `public`, `private`
 }
 
-enum ReactionType: String, Sendable, Hashable {
+enum ReactionType: String, Sendable, Hashable, CaseIterable {
     case like, love, haha, wow, sad
 }
 
@@ -344,6 +344,104 @@ struct BookmarkResult: Decodable, Sendable {
  * 0.1.0의 포스트 상세·친구 탭이 그것을 쓰고 있어서 같은 이름을 쓰면 그 화면들이 깨진다. */
 struct ShareLinkResponse: Decodable, Sendable {
     let url: String
+}
+
+// MARK: - 소셜
+
+/* 목록에 실리는 사용자. `PostAuthor`와 모양이 같지만 **다른 스키마**다
+ * (`UserPageDto`와 `PostDto.author`). 서버가 한쪽에 필드를 더하면 여기서 갈리므로
+ * 같은 타입으로 합치지 않는다. */
+struct UserSummary: Decodable, Sendable, Hashable {
+    let id: UUID
+    let nickname: String?
+    let avatarUrl: String?
+}
+
+typealias UserPage = Page<UserSummary>
+
+/* 타인 프로필. **관계를 네 값으로 준다** — 서버가 판단해서 내려주므로 앱이 조합하지 않는다.
+ *
+ * `friend`는 `following && followedBy`지만 서버가 따로 실어 주므로 그것을 쓴다. 앱이 계산하면
+ * 서버가 친구 정의를 바꿀 때(예: 차단 고려) 화면만 옛 규칙을 따른다. */
+struct PublicProfile: Decodable, Sendable, Hashable {
+    let id: UUID
+    let nickname: String?
+    let avatarUrl: String?
+    let friendCount: Int
+    let following: Bool
+    let followedBy: Bool
+    let friend: Bool
+    let blocking: Bool
+}
+
+/// 팔로우/언팔로우 결과. 서버가 **결과 상태**를 주므로 앱이 뒤집어 짐작하지 않는다.
+struct FollowResult: Decodable, Sendable {
+    let following: Bool
+    let friend: Bool
+}
+
+/* 추천 친구. **커서가 없다** — 페이지가 아니라 한 번에 오는 목록이다
+ * (`RecommendedUsersDto`에 `nextCursor`가 없다). */
+struct RecommendedUsers: Decodable, Sendable {
+    struct Item: Decodable, Sendable, Hashable {
+        let id: UUID
+        let nickname: String?
+        let avatarUrl: String?
+        /// 함께 아는 친구 수. 추천의 근거라 화면에 그대로 보여준다.
+        let mutualFriendCount: Int
+    }
+
+    let items: [Item]
+}
+
+// MARK: - 댓글 · 반응 · 신고
+
+struct Comment: Decodable, Sendable, Hashable {
+    let id: UUID
+    let author: UserSummary
+    let body: String
+    let createdAt: String
+}
+
+typealias CommentPage = Page<Comment>
+
+struct CreateCommentBody: Encodable, Sendable {
+    let body: String
+}
+
+struct PutReactionBody: Encodable, Sendable {
+    let type: ServerEnum<ReactionType>
+}
+
+enum ReportTargetType: String, Sendable, Hashable {
+    case post, comment, user
+}
+
+enum ReportReason: String, Sendable, Hashable, CaseIterable {
+    case spam, abuse, sexualContent, copyright, other
+}
+
+struct CreateReportBody: Encodable, Sendable {
+    let targetType: ServerEnum<ReportTargetType>
+    let targetId: UUID
+    let reason: ServerEnum<ReportReason>
+    /// 선택. 보내지 않으려면 키를 빼고, 지우려면 `null`이다.
+    var detail: Field<String>?
+}
+
+/* 접수 결과. 화면은 "접수했어요"만 말하면 되지만 `status`를 받아 둔다 —
+ * 처리 상태를 보여주는 화면이 생길 때 이 파일을 다시 열지 않기 위해서다. */
+struct Report: Decodable, Sendable {
+    enum Status: String, Sendable, Hashable {
+        case pending, reviewing, resolved
+    }
+
+    let id: UUID
+    let targetType: ServerEnum<ReportTargetType>
+    let targetId: UUID
+    let reason: ServerEnum<ReportReason>
+    let status: ServerEnum<Status>
+    let createdAt: String
 }
 
 // MARK: - optional × nullable
