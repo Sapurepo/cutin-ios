@@ -11,26 +11,83 @@ struct PostCard: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.x2) {
+        VStack(alignment: .leading, spacing: Spacing.x3) {
             PostImage(post: post)
 
             HStack(spacing: Spacing.x2) {
-                AvatarView(url: post.author.avatarUrl, nickname: post.author.nickname, size: 22)
+                AvatarView(url: post.author.avatarUrl, nickname: post.author.nickname, size: 26)
                 Text(post.author.nickname ?? "이름 없음")
-                    .font(Typography.chip)
+                    .font(Typography.subheadline)
                     .foregroundStyle(palette.textPrimary)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.x2)
                 if let date = post.displayDate {
-                    Text(date, format: .dateTime.year().month().day())
-                        .font(Typography.numeric)
+                    Text(date.casual())
+                        .font(Typography.caption)
                         .foregroundStyle(palette.textSecondary)
                 }
             }
 
             if let caption = post.caption, !caption.isEmpty {
                 Text(caption)
-                    .font(Typography.bodyText)
+                    .font(Typography.body)
                     .foregroundStyle(palette.textPrimary)
+                    .lineLimit(3)
+            }
+
+            ReactionDigest(post: post)
+        }
+    }
+}
+
+/* 카드가 받은 반응·댓글의 요약 — 카드 맨 아래 한 줄.
+ *
+ * 받은 이모지를 **겹쳐 쌓고**(많이 받은 순, 셋까지) 총 개수를 붙인다. 이모지 다섯 개를 전부
+ * 늘어놓지 않는다 — 카드에서는 "무슨 반응이 몇 개"가 아니라 "반응이 있다, 대화가 있다"만
+ * 보이면 된다. 세는 건 상세다. 댓글은 말풍선 + 수. 둘 다 없으면 줄 자체가 없다 — 빈 줄에
+ * "아직 없음"을 적으면 조용한 카드가 쓸쓸한 카드가 된다. */
+struct ReactionDigest: View {
+    let post: Post
+
+    @Environment(\.palette) private var palette
+
+    private var topEmojis: [String] {
+        post.reactions.counts
+            .filter { $0.count > 0 }
+            .sorted { $0.count > $1.count }
+            .prefix(3)
+            .compactMap { $0.type.known?.emoji }
+    }
+
+    var body: some View {
+        if post.reactions.total > 0 || post.commentCount > 0 {
+            HStack(spacing: Spacing.x3) {
+                if post.reactions.total > 0 {
+                    HStack(spacing: Spacing.x1) {
+                        // 많이 받은 것이 맨 앞·맨 위에 — HStack은 뒤의 뷰가 위에 그려지므로 z를 뒤집는다.
+                        HStack(spacing: -6) {
+                            ForEach(Array(topEmojis.enumerated()), id: \.offset) { index, emoji in
+                                Text(emoji)
+                                    .font(.system(size: 13))
+                                    .padding(2)
+                                    .background(palette.surface, in: .circle)
+                                    .zIndex(Double(topEmojis.count - index))
+                            }
+                        }
+                        Text("\(post.reactions.total)")
+                            .font(Typography.label)
+                            .foregroundStyle(palette.textSecondary)
+                    }
+                }
+                if post.commentCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "bubble.left")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("\(post.commentCount)")
+                            .font(Typography.label)
+                    }
+                    .foregroundStyle(palette.textSecondary)
+                }
+                Spacer(minLength: 0)
             }
         }
     }

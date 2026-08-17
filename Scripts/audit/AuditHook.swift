@@ -1,6 +1,6 @@
 /* AUDIT-HOOK (커밋 금지) — UI 감사용. 환경변수로 화면을 바로 연다.
  *
- *   AUDIT_SCREEN = feed | notifications | postDetail | comments | userProfile | tips | catalog
+ *   AUDIT_SCREEN = feed | notifications | postDetail | userProfile | tips | catalog
  *                | notificationSettings | friends | profile | archive
  *                | captureSetup | camera | template | filter | finish
  *   AUDIT_POST / AUDIT_USER = UUID
@@ -24,7 +24,6 @@ enum AuditHook {
         switch screen {
         case "notifications": return [.notifications]
         case "postDetail": return [.postDetail(post)]
-        case "comments": return [.postDetail(post), .comments(post)]
         case "userProfile": return [.userProfile(user)]
         case "notificationSettings": return [.notificationSettings]
         case "tips": return [.tips]
