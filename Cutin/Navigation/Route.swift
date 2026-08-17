@@ -11,6 +11,8 @@ import Foundation
 
 enum Route: Hashable {
     case postDetail(UUID)
+    /// 같은 상세인데 **댓글 입력칸에 포커스**를 주고 연다 — 미리보기의 "댓글"이 쓴다.
+    case postComments(UUID)
     /// 타인 프로필(§9). 내 프로필은 탭이라 여기 오지 않는다.
     case userProfile(UUID)
     /// 인앱 알림(§10). 탭이 아니라 피드 툴바에서 푸시한다 — 5탭은 명세로 확정돼 있다.

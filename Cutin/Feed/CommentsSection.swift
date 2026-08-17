@@ -128,6 +128,8 @@ struct CommentsSection: View {
  * 사라지고, 길게 쓴 댓글일수록 그 손실이 크다. */
 struct CommentComposer: View {
     let postId: UUID
+    /// 나타나자마자 포커스(키보드) — "댓글 남기러 왔다"는 진입에서만. 푸시 전환이 끝난 뒤에 준다.
+    var focusesOnAppear = false
     /// 성공한 뒤 — 상세가 포스트 요약(댓글 수)을 다시 받는 데 쓴다.
     var onPosted: () async -> Void = {}
 
@@ -165,6 +167,12 @@ struct CommentComposer: View {
         .padding(.horizontal, Spacing.x4)
         .padding(.vertical, Spacing.x2)
         .background(palette.bg)
+        .task {
+            guard focusesOnAppear else { return }
+            // 푸시 전환(약 0.35초)이 끝난 뒤 — 전환 중에 키보드가 올라오면 화면이 두 번 움직인다.
+            try? await Task.sleep(for: .milliseconds(450))
+            isFocused = true
+        }
     }
 
     private var canSend: Bool {

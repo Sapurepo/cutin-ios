@@ -148,11 +148,11 @@ struct PostThumbnail: View {
             .overlay { RemoteImage(url: post.gridImageURL) }
             .clipped()
             .overlay(alignment: .topTrailing) {
-            // 배지는 웜 포인트 — "지금 켜져 있는 것"의 색이다(토큰 머리말).
+            // 배지는 켜진 것의 색(잉크 원 + 반대색 핀) — 토큰 머리말.
             if post.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(palette.accentOn)
                     .padding(4)
                     .background(palette.brand, in: .circle)
                     .padding(4)

@@ -21,6 +21,8 @@ import SwiftUI
 
 struct PostDetailView: View {
     let id: UUID
+    /// 열자마자 댓글 입력칸에 포커스 — 미리보기의 "댓글"에서 온 경우(`Route.postComments`).
+    var focusesComposer = false
 
     @Environment(PostStore.self) private var store
     @Environment(AuthSession.self) private var session
@@ -72,7 +74,9 @@ struct PostDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CommentComposer(postId: post.id) { await store.refresh(id: post.id) }
+            CommentComposer(postId: post.id, focusesOnAppear: focusesComposer) {
+                await store.refresh(id: post.id)
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
