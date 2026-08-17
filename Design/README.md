@@ -57,7 +57,7 @@
 | 묶음 | 값 | 규칙 |
 |---|---|---|
 | 크롬 | `bg` `surface` `surfaceSunken` `surfaceRaised` `border` `borderStrong` `textPrimary` `textSecondary` `accent`(잉크) | 위계는 FILL/OUTLINE/WEIGHT/SIZE. CTA는 `accent` 채움 하나 |
-| 웜 포인트 | `brand`(채움·점·배지) `brandInk`(글자·아이콘) `brandSoft`(켜진 칩의 면) | **켜진 것에만.** CTA·탭바에 쓰지 않는다 |
+| 켜진 것 | `brand`(테두리·점·배지 = 잉크) `brandInk`(글자·아이콘 = 잉크) `brandSoft`(켜진 칩의 면 = sunken) | **켜진 것에만.** 옅은 면 + 잉크 테두리 + 굵은 글씨. 이름이 brand인 이유는 토큰 머리말 |
 | 타이포 | largeTitle 28 · title 22 · headline 17 · subheadline 15 · body 15 · bodyText 14(이행 중) · label 13 · caption 11 · chip 12 · buttonLabel 15 · numeric(Geist) · logo(Geist) | 임의 크기 없음 — 필요하면 단계를 늘린다 |
 | 움직임 | `Motion.quick` `.standard` `.emphasized` · `Duration.fast` `.medium` | 손끝 / 화면 안 / 화면 전환 |
 | 표면 | `raised()` | 카드는 이걸로 뜬다. 그림자 값을 화면이 고르지 않는다 |
