@@ -33,7 +33,10 @@ struct OnboardingView: View {
     @FocusState private var isFocused: Bool
 
     /// 서버에 이미 저장된 닉네임. 저장은 됐는데 온보딩이 닫히지 않은 채 다시 들어온 경우다.
+    private let saved: String?
+
     init(saved: String?) {
+        self.saved = saved
         _nickname = State(initialValue: saved ?? "")
     }
 
@@ -137,6 +140,11 @@ struct OnboardingView: View {
     private func check() async {
         availability = nil
         guard !trimmed.isEmpty else { return }
+        /* 내 이름은 묻지 않는다. 서버의 가용성 검사는 본인을 제외하지 않아 저장된 닉네임 그대로면
+         * "이미 누군가 쓰고 있어요"가 뜨고 시작 버튼이 잠긴다 — 이름을 바꾸지 않으면 나갈 수
+         * 없는 화면이 된다(2026-08-17 감사 B5). 저장 경로(`completeOnboarding`)는 같은 이름이면
+         * PATCH를 건너뛰므로 여기서도 건너뛰는 것이 맞다. 대소문자는 서버가 lower로 비교한다. */
+        if let saved, trimmed.lowercased() == saved.lowercased() { return }
 
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { return }
