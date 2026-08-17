@@ -19,9 +19,10 @@ struct RemoteImage: View {
 
     @Environment(\.palette) private var palette
 
+    /* 자리색은 **그림이 없는 동안만** 깐다. 그림 뒤에 늘 깔아 두면 `.fit`으로 남는 여백에
+     * 자리색 띠가 비친다 — 카드가 떠 있을 때(`raised`) 그 띠가 카드 일부처럼 보인다(0.4.0 리뷰). */
     var body: some View {
         ZStack {
-            placeholder ?? palette.surfaceSunken
             if let url {
                 AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: Duration.medium))) { phase in
                     switch phase {
@@ -29,17 +30,22 @@ struct RemoteImage: View {
                         image.resizable().aspectRatio(contentMode: contentMode)
                             .transition(.opacity)
                     case .empty:
+                        placeholderColor
                         if shimmers { Shimmer() }
                     case .failure:
                         // 깨진 아이콘을 그리지 않는다 — 자리 색이 곧 "없음"이다. 사용자가 할 일이 없다.
-                        EmptyView()
+                        placeholderColor
                     @unknown default:
-                        EmptyView()
+                        placeholderColor
                     }
                 }
+            } else {
+                placeholderColor
             }
         }
     }
+
+    private var placeholderColor: Color { placeholder ?? palette.surfaceSunken }
 }
 
 /* 스켈레톤 반짝임. 자리 색 위로 옅은 띠가 한 방향으로 지나간다 — "받는 중"을 스피너 없이 말한다.
