@@ -16,19 +16,32 @@ struct AuthGate: View {
      * 도움말이 재설치 후 한 번 더 뜨는 것은 사고가 아니다. 재열람은 프로필의 도움말 메뉴다. */
     @AppStorage("tips.seen") private var hasSeenTips = false
 
+    /* 인트로가 끝났는지. `restore()`가 인트로보다 먼저 끝나도 연출은 끝까지 가고, 늦게 끝나면
+     * 인트로가 (짧게) 더 머문다 — 어느 쪽이든 빈 화면은 없다. 앱 수명 동안 한 번만 false다. */
+    @State private var isIntroDone = false
+
     var body: some View {
-        content
-            /* 앱을 켤 때 한 번. `.task`는 뷰가 사라지면 취소되는데 이 뷰는 앱 수명 동안
-             * 살아 있으므로 취소 걱정이 없다. */
-            .task { await session.restore() }
+        ZStack {
+            content
+            if !isIntroDone {
+                IntroView { isIntroDone = true }
+                    .environment(\.palette, Palette.of(colorScheme))
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .animation(Motion.standard, value: isIntroDone)
+        /* 앱을 켤 때 한 번. `.task`는 뷰가 사라지면 취소되는데 이 뷰는 앱 수명 동안
+         * 살아 있으므로 취소 걱정이 없다. */
+        .task { await session.restore() }
     }
 
     @ViewBuilder
     private var content: some View {
         switch session.phase {
         case .restoring:
-            /* 스플래시를 따로 그리지 않는다. Keychain 읽기는 즉시 끝나고 `/users/me` 왕복만
-             * 남으므로 대개 한 프레임이다 — 로고를 띄우면 오히려 번쩍인다. */
+            /* 인트로가 위를 덮고 있다(`IntroView` 머리말). 인트로가 끝난 뒤에도 복원이 안 끝났으면
+             * 빈 배경이 잠깐 보인다 — 서버가 1초 넘게 걸리는 경우뿐이다. */
             Color(Palette.of(colorScheme).bg).ignoresSafeArea()
         case .signedOut:
             LoginView()
