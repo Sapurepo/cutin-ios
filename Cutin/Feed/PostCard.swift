@@ -63,12 +63,14 @@ struct ReactionDigest: View {
             HStack(spacing: Spacing.x3) {
                 if post.reactions.total > 0 {
                     HStack(spacing: Spacing.x1) {
+                        // 많이 받은 것이 맨 앞·맨 위에 — HStack은 뒤의 뷰가 위에 그려지므로 z를 뒤집는다.
                         HStack(spacing: -6) {
-                            ForEach(Array(topEmojis.enumerated()), id: \.offset) { _, emoji in
+                            ForEach(Array(topEmojis.enumerated()), id: \.offset) { index, emoji in
                                 Text(emoji)
                                     .font(.system(size: 13))
                                     .padding(2)
                                     .background(palette.surface, in: .circle)
+                                    .zIndex(Double(topEmojis.count - index))
                             }
                         }
                         Text("\(post.reactions.total)")
