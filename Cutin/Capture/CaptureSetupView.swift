@@ -15,11 +15,24 @@ struct CaptureSetupView: View {
     @Environment(TemplateCatalog.self) private var catalog
     @Environment(\.palette) private var palette
 
-    /// nil이면 "아직 안 골랐다" — 목록의 첫 컷 수를 기본으로 쓴다.
+    /// nil이면 "아직 안 골랐다" — 네 컷을 기본으로 쓴다(`activeCutCount`).
     @State private var cutCount: Int?
     @State private var mode: CaptureMode = .burst
+    /// 고른 배치. nil이면 그 컷 수의 첫 배치 — 편집 1단계에서 바꿀 수 있으니 여기서는 미리보기에 가깝다.
+    @State private var templateId: UUID?
 
-    private var activeCutCount: Int? { cutCount ?? catalog.cutCounts.first }
+    /// 기본은 **네 컷** — 이 앱의 이름이자 가장 흔한 선택이다. 목록에 없으면 첫 값.
+    private var activeCutCount: Int? {
+        cutCount ?? (catalog.cutCounts.contains(4) ? 4 : catalog.cutCounts.first)
+    }
+
+    private var layouts: [Template] {
+        activeCutCount.map { catalog.templates(cutCount: $0) } ?? []
+    }
+
+    private var activeTemplate: Template? {
+        layouts.first { $0.id == templateId } ?? layouts.first
+    }
 
     var body: some View {
         Group {
@@ -39,6 +52,7 @@ struct CaptureSetupView: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: Spacing.x8) {
             countSection
+            layoutSection
             modeSection
             Spacer()
             startButton
@@ -76,8 +90,55 @@ struct CaptureSetupView: View {
                 ForEach(catalog.cutCounts, id: \.self) { option in
                     CutinChip(label: "\(option)컷", selected: option == activeCutCount, style: .block) {
                         cutCount = option
+                        templateId = nil
                     }
                 }
+            }
+        }
+    }
+
+    /* 배치 미리보기 — 고른 컷 수의 배치를 도형으로 보여주고 하나를 고른다. 0.3.0은 컷 수만 고르고
+     * 배치는 찍은 뒤에야 봤다(0.4.0 감사 — 화면 절반이 비어 있었다). 여기서 고른 것이 시작 배치가
+     * 되고, 편집 1단계에서 같은 컷 수 안에서 바꿀 수 있다. 배치가 하나뿐이면 고를 게 없으니 숨긴다. */
+    @ViewBuilder
+    private var layoutSection: some View {
+        if layouts.count > 1 {
+            VStack(alignment: .leading, spacing: Spacing.x3) {
+                Text("어떻게 놓을까요?")
+                    .font(Typography.headline)
+                    .foregroundStyle(palette.textPrimary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.x2) {
+                        ForEach(layouts, id: \.id) { template in
+                            let selected = template.id == activeTemplate?.id
+                            Button {
+                                templateId = template.id
+                            } label: {
+                                VStack(spacing: Spacing.x2) {
+                                    TemplateGlyph(template: template, height: 44, selected: selected)
+                                        .frame(height: 44)
+                                    Text(template.name)
+                                        .font(selected ? Typography.font(.body, .semibold, size: 12) : Typography.chip)
+                                        .foregroundStyle(selected ? palette.brandInk : palette.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                .frame(minWidth: 72)
+                                .padding(.horizontal, Spacing.x3)
+                                .padding(.vertical, Spacing.x3)
+                                .background(selected ? palette.brandSoft : palette.surface, in: .rect(cornerRadius: Radius.sm))
+                                .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
+                                             color: selected ? palette.brand : palette.border)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(template.name)
+                            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+                Text("찍고 나서도 바꿀 수 있어요")
+                    .font(Typography.caption)
+                    .foregroundStyle(palette.textSecondary)
             }
         }
     }
@@ -126,15 +187,13 @@ struct CaptureSetupView: View {
      * 배치는 편집 1단계에서 같은 컷 수 안에서 바꾼다. */
     private var startButton: some View {
         Button {
-            guard let cutCount = activeCutCount,
-                  let template = catalog.defaultTemplate(cutCount: cutCount)
-            else { return }
+            guard let template = activeTemplate else { return }
             flow.configure(template: template, frame: catalog.defaultFrame, mode: mode)
             onStart()
         } label: {
             Text("촬영 시작").primaryGlassLabel()
         }
         .primaryGlassButton(tint: palette.accent)
-        .disabled(activeCutCount == nil)
+        .disabled(activeTemplate == nil)
     }
 }
