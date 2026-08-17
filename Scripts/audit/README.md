@@ -15,7 +15,7 @@
 |---|---|
 | `seed/seed.py` | 로컬 서버에 사용자 5명 · 포스트 15개(템플릿·프레임 골고루) · 팔로우 · 댓글 · 반응을 **API로** 넣는다. 멱등 |
 | `seed/compose.swift` | 시드용 컷·합성본 JPEG — 앱의 `CutCompositor` 규칙(프레임 padding/gutter/radius/푸터)을 흉내낸다 |
-| `AuditHook.swift` + `hook.patch` | `AUDIT_TOKEN`으로 세션을 심고 `AUDIT_SCREEN`으로 화면을 연다. **커밋하지 않는다** |
+| `AuditHook.swift` + `hook.patch` | `AUDIT_TOKEN`으로 세션을 심고 `AUDIT_SCREEN`으로 화면을 연다(`catalog`는 디자인 카탈로그, `AUDIT_SECTION=buttons`처럼 절로 스크롤). **커밋하지 않는다** |
 | `shoot.sh` / `shoot-all.sh` | 화면 하나 / 전부를 라이트·다크로 찍고 콘택트 시트를 만든다 |
 | `montage.swift` | 스크린샷을 라벨 붙여 격자로 모은다 |
 
@@ -63,6 +63,8 @@ git apply -R Scripts/audit/hook.patch && rm Cutin/AuditHook.swift
 - **키체인은 앱을 지워도 남습니다.** 로그인 화면을 찍으려면 `simctl keychain reset`.
 - 편집 3단계는 `AuditHook`이 `Documents/Drafts/`에 draft 메타를 쓰고 이어쓰기로 엽니다. 컷 파일은
   `shoot-all.sh`가 컨테이너에 복사합니다. 카메라를 루트에 두지 않는 이유는 위 권한 대화상자.
+- 편집 단계의 컷 파일은 `cp`가 **생성 시각을 보존**하므로 훅이 draft `createdAt`을 20시간 전으로 둡니다 —
+  `DraftStore`는 draft보다 오래된 컷을 이전 촬영의 잔여로 보고 지웁니다.
 - 시드 사진은 시뮬레이터 샘플 사진 6장 + macOS 배경화면 2장입니다. 실제 인물 사진이 아니라
   얼굴이 들어가는 컷의 느낌은 실기기로 봐야 합니다.
 

@@ -1,6 +1,6 @@
 /* 포스트 카드 — 피드(§4.1)·보관(§7.4) 두 목록이 같은 모양을 쓴다.
  *
- * 0.1.0은 로컬 JPEG를 직접 디코드했다. 지금은 서버가 준 URL이라 `AsyncImage`가 받는다 —
+ * 0.1.0은 로컬 JPEG를 직접 디코드했다. 지금은 서버가 준 URL이라 `RemoteImage`가 받는다 —
  * `/media/content/…`는 인증을 요구하지 않고 URLSession 공유 캐시가 그대로 듣는다. */
 
 import SwiftUI
@@ -41,32 +41,31 @@ struct PostCard: View {
  * `composed`는 **발행 전에는 null**이라(계약상 required + nullable) 옵셔널로 다룬다.
  * 피드에는 발행된 것만 오지만, 같은 카드를 draft에 쓰게 되는 날 조용히 깨지지 않도록.
  *
- * 자리를 정사각으로 잡는 대신 **템플릿 비율**을 쓴다. 서버가 배치를 주므로 그릴 수 있고,
- * 그래야 이미지가 도착할 때 목록이 튀지 않는다(`strip4`는 세로로 길다). */
+ * 자리는 **합성본의 실제 픽셀 비율**로 잡는다 — 서버가 `complete` 때 받은 width·height를
+ * 돌려준다. 그래야 이미지가 도착할 때 목록이 튀지 않고, 자리와 그림이 어긋나 자리색 띠가
+ * 남지 않는다. 0.3.0은 템플릿 그리드 비율을 썼는데, 합성본은 프레임 여백과 푸터를 포함해
+ * 그리드보다 늘 조금 길다 — 그 차이만큼 회색 띠가 카드 아래에 붙었다(0.4.0 리뷰).
+ * 크기가 없으면(옛 미디어) 그리드 비율로 떨어진다. */
 struct PostImage: View {
     let post: Post
 
     @Environment(\.palette) private var palette
 
     private var ratio: CGFloat {
-        1 / CutGeometry.heightPerWidth(post.template.aspectRatio)
+        if let composed = post.composed, let width = composed.width, let height = composed.height,
+           width > 0, height > 0 {
+            return CGFloat(width) / CGFloat(height)
+        }
+        return 1 / CutGeometry.heightPerWidth(post.template.aspectRatio)
     }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Radius.md)
-                .fill(palette.surfaceSunken)
-
-            if let composed = post.composed, let url = URL(string: composed.url) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFit()
-                } placeholder: {
-                    ProgressView().tint(palette.textSecondary)
-                }
-            }
-        }
-        .aspectRatio(ratio, contentMode: .fit)
-        .clipShape(.rect(cornerRadius: Radius.md))
+        RemoteImage(url: post.composed.flatMap { URL(string: $0.url) }, contentMode: .fit)
+            .aspectRatio(ratio, contentMode: .fit)
+            .clipShape(.rect(cornerRadius: Radius.md))
+            /* 합성본이 곧 카드다 — 배경에서 뜨게 한다. 흰 프레임(가장 흔하다)이 오프화이트 배경과
+             * 붙어 어디까지가 사진인지 안 보이던 것(감사·피드)을 그림자/헤어라인이 가른다. */
+            .raised(cornerRadius: Radius.md)
     }
 }
 
@@ -89,23 +88,16 @@ struct PostThumbnail: View {
         Rectangle()
             .fill(palette.surfaceSunken)
             .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if let url = post.gridImageURL {
-                    AsyncImage(url: url) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Color.clear
-                    }
-                }
-            }
+            .overlay { RemoteImage(url: post.gridImageURL) }
             .clipped()
             .overlay(alignment: .topTrailing) {
+            // 배지는 웜 포인트 — "지금 켜져 있는 것"의 색이다(토큰 머리말).
             if post.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(palette.accentOn)
+                    .foregroundStyle(.white)
                     .padding(4)
-                    .background(palette.accent, in: .circle)
+                    .background(palette.brand, in: .circle)
                     .padding(4)
             }
         }

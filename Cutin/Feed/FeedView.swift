@@ -47,7 +47,7 @@ struct FeedView: View {
                 .overlay(alignment: .topTrailing) {
                     if notifications.unread > 0 {
                         Circle()
-                            .fill(palette.accent)
+                            .fill(palette.brand)
                             .frame(width: 8, height: 8)
                             .offset(x: 4, y: -2)
                     }

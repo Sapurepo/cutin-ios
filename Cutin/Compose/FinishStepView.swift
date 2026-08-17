@@ -115,13 +115,13 @@ struct FinishStepView: View {
                 .frame(width: 52, height: 52)
                 .clipShape(.rect(cornerRadius: Radius.sm))
                 .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
-                             color: selected ? palette.accent : palette.border,
+                             color: selected ? palette.brand : palette.border,
                              lineWidth: selected ? 2 : 1)
                 .overlay(alignment: .topTrailing) {
                     if selected && pins(index) {
                         Image(systemName: "pin.circle.fill")
                             .font(.system(size: 15))
-                            .foregroundStyle(palette.accent)
+                            .foregroundStyle(palette.brand)
                             .background(palette.bg, in: .circle)
                             .offset(x: 4, y: -4)
                     }
