@@ -56,16 +56,19 @@ struct IntroView: View {
 
     /* 칸 하나 — 살짝 작았다가 자리를 잡고(0.86→1), 나타나는 순간 흰 플래시가 스치고 사라진다.
      * `keyframeAnimator`로 칸마다 시작 시각을 늦춘다 — 앞의 `hold` 구간이 그 지연이다. */
+    @ViewBuilder
     private func cut(_ index: Int) -> some View {
         let isLast = index == 3
-        let delay = reduceMotion ? 0 : Self.beat * Double(index) + 0.05
-        return RoundedRectangle(cornerRadius: Radius.sm)
+        let square = RoundedRectangle(cornerRadius: Radius.sm)
             .fill(isLast ? palette.brand : palette.textPrimary)
             .frame(width: Self.cutSize, height: Self.cutSize)
-            .keyframeAnimator(initialValue: CutState(scale: reduceMotion ? 1 : 0.86,
-                                                     opacity: reduceMotion ? 1 : 0,
-                                                     flash: 0),
-                              trigger: started) { view, state in
+        if reduceMotion {
+            // 애니메이터를 아예 걸지 않는다 — 걸면 첫 프레임에 트랙 시작값(0.86 · 투명)이 스친다.
+            square
+        } else {
+            let delay = Self.beat * Double(index) + 0.05
+            square.keyframeAnimator(initialValue: CutState(scale: 0.86, opacity: 0, flash: 0),
+                                    trigger: started) { view, state in
                 view
                     .scaleEffect(state.scale)
                     .opacity(state.opacity)
@@ -91,12 +94,13 @@ struct IntroView: View {
             }
             .onChange(of: started) { _, _ in
                 // 넷째 컷의 셔터 — 그 시각에 맞춰 한 번.
-                guard isLast, !reduceMotion else { return }
+                guard isLast else { return }
                 Task {
                     try? await Task.sleep(for: .seconds(delay))
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             }
+        }
     }
 
     private struct CutState {
@@ -107,16 +111,22 @@ struct IntroView: View {
 
     // MARK: - 워드마크
 
+    @ViewBuilder
     private var wordmark: some View {
-        let delay = reduceMotion ? 0 : Self.beat * 3 + 0.11
         let ink = palette.textPrimary   // 애니메이터 클로저는 비격리라 환경을 밖에서 읽어 둔다
-        // 자간은 Text에만 걸리므로 글자를 애니메이터 안에서 그린다 — 밖의 자리만 고정해 둔다.
-        return Color.clear
-            .frame(width: 160, height: 36)
-            .keyframeAnimator(initialValue: MarkState(kerning: reduceMotion ? 30 * Typography.logoKerning : 30 * 0.32,
-                                                      offset: reduceMotion ? 0 : 14,
-                                                      opacity: reduceMotion ? 1 : 0),
-                              trigger: started) { view, state in
+        if reduceMotion {
+            Text("CUTIN")
+                .font(Typography.logo(size: 30))
+                .kerning(30 * Typography.logoKerning)
+                .foregroundStyle(ink)
+                .frame(width: 160, height: 36)
+        } else {
+            let delay = Self.beat * 3 + 0.11
+            // 자간은 Text에만 걸리므로 글자를 애니메이터 안에서 그린다 — 밖의 자리만 고정해 둔다.
+            Color.clear
+                .frame(width: 160, height: 36)
+                .keyframeAnimator(initialValue: MarkState(kerning: 30 * 0.32, offset: 14, opacity: 0),
+                                  trigger: started) { view, state in
                 view.overlay {
                     Text("CUTIN")
                         .font(Typography.logo(size: 30))
@@ -139,6 +149,7 @@ struct IntroView: View {
                     SpringKeyframe(30 * Typography.logoKerning, duration: 0.45, spring: .smooth(duration: 0.45))
                 }
             }
+        }
     }
 
     private struct MarkState {

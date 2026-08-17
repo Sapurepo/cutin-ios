@@ -36,13 +36,21 @@ struct AuthGate: View {
         .task { await session.restore() }
     }
 
+    /* 인트로가 덮고 있는 동안 아래에 무엇을 둘지는 화면마다 다르다.
+     *
+     * 탭 셸(`RootView`)은 **미리** 둔다 — 덮개 뒤에서 피드·카탈로그를 받아 두면 인트로가 걷힐 때
+     * 이미 채워져 있다. 로그인·온보딩·팁은 인트로가 끝난 **뒤에** 둔다 — 로그인의 스트립 등장
+     * 연출과 온보딩의 자동 포커스(키보드)가 덮개 뒤에서 아무도 못 보는 채 지나가 버린다.
+     * 그래서 이 셋은 인트로가 걷히는 순간 나타나 자기 연출을 시작한다. */
     @ViewBuilder
     private var content: some View {
         switch session.phase {
         case .restoring:
             /* 인트로가 위를 덮고 있다(`IntroView` 머리말). 인트로가 끝난 뒤에도 복원이 안 끝났으면
              * 빈 배경이 잠깐 보인다 — 서버가 1초 넘게 걸리는 경우뿐이다. */
-            Color(Palette.of(colorScheme).bg).ignoresSafeArea()
+            blank
+        case _ where !isIntroDone && !isShell:
+            blank
         case .signedOut:
             LoginView()
                 .environment(\.palette, Palette.of(colorScheme))
@@ -60,5 +68,17 @@ struct AuthGate: View {
         case .signedIn:
             RootView()
         }
+    }
+
+    private var blank: some View {
+        Color(Palette.of(colorScheme).bg).ignoresSafeArea()
+    }
+
+    /// 로그인 + 온보딩 완료 + 팁 봄 — 탭 셸이 뜨는 조건과 같다.
+    private var isShell: Bool {
+        if case .signedIn(let profile) = session.phase {
+            return profile.onboardingCompleted && hasSeenTips
+        }
+        return false
     }
 }
