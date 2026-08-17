@@ -71,7 +71,12 @@ struct FinishStepView: View {
     /* 대표 컷(§6.3). **안 골라도 된다** — 미지정이면 서버가 첫 컷을 기본으로 쓴다.
      * 직접 고른 것과 기본의 구분이 실제 동작을 가른다: 고른 포스트만 프로필 그리드 맨 앞에
      * 고정된다(0.3.0 제품 결정). 그래서 기본 선택을 채워 두지 않고, 고른 것을 다시 누르면
-     * 해제된다 — 고정을 무르는 길이 있어야 한다. */
+     * 해제된다 — 고정을 무르는 길이 있어야 한다.
+     *
+     * **첫 컷을 고르면 고정되지 않는다.** 서버가 발행 시 미지정을 0으로 채우므로 "첫 컷 지정"과
+     * "미지정"은 서버에서 같은 값이고, 그리드의 `Post.isPinned`도 0을 기본으로 본다. 여기서
+     * 고정된다고 말하면 발행 뒤 그리드에 핀이 없어 거짓 약속이 된다 — 문구와 배지를 같은 규칙에서
+     * 낸다(`pins`). 서버가 미지정을 null로 남기게 되면(cutin-backend#13) 이 구분은 사라진다. */
     private var thumbnailField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("대표 컷")
@@ -82,11 +87,20 @@ struct FinishStepView: View {
                     thumbnailChoice(index: index, cut: cut)
                 }
             }
-            Text(flow.thumbnailCutIndex == nil
-                 ? "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
-                 : "이 포스트가 프로필 맨 위에 고정돼요")
+            Text(thumbnailHint)
                 .font(Typography.caption)
                 .foregroundStyle(palette.textSecondary)
+        }
+    }
+
+    /// 고른 컷이 실제로 고정을 만드는지 — `Post.isPinned`와 같은 규칙(0은 기본).
+    private func pins(_ index: Int) -> Bool { index != 0 }
+
+    private var thumbnailHint: String {
+        switch flow.thumbnailCutIndex {
+        case nil: return "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
+        case 0?: return "첫 컷은 기본 대표라 고정되지 않아요. 다른 컷을 고르면 고정돼요"
+        default: return "이 포스트가 프로필 맨 위에 고정돼요"
         }
     }
 
@@ -104,7 +118,7 @@ struct FinishStepView: View {
                              color: selected ? palette.accent : palette.border,
                              lineWidth: selected ? 2 : 1)
                 .overlay(alignment: .topTrailing) {
-                    if selected {
+                    if selected && pins(index) {
                         Image(systemName: "pin.circle.fill")
                             .font(.system(size: 15))
                             .foregroundStyle(palette.accent)

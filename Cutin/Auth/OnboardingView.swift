@@ -139,6 +139,8 @@ struct OnboardingView: View {
 
     private func check() async {
         availability = nil
+        // 취소된 이전 확인이 "확인 중…"을 켜 둔 채 끝났을 수 있다 — 새 확인은 꺼진 상태에서 시작한다.
+        isChecking = false
         guard !trimmed.isEmpty else { return }
         /* 내 이름은 묻지 않는다. 서버의 가용성 검사는 본인을 제외하지 않아 저장된 닉네임 그대로면
          * "이미 누군가 쓰고 있어요"가 뜨고 시작 버튼이 잠긴다 — 이름을 바꾸지 않으면 나갈 수
