@@ -82,16 +82,29 @@ struct NotificationsView: View {
         }
     }
 
+    /* 한 줄: 아바타(종류 배지) · 문장 · 시각 · 안 읽음 점. 안 읽은 것은 문장을 굵게 — 목록을
+     * 훑을 때 새 것과 본 것이 무게로 갈린다. 종류는 아바타 모서리의 작은 심볼로 — 문장이 전부
+     * "○○님이 …했어요"라 심볼이 없으면 훑어서 구분이 안 됐다(0.4.0 감사). */
     private func row(_ item: AppNotification) -> some View {
-        HStack(spacing: Spacing.x3) {
-            AvatarView(url: item.actor.avatarUrl, nickname: item.actor.nickname, size: 36)
+        let unread = item.readAt == nil
+        return HStack(spacing: Spacing.x3) {
+            AvatarView(url: item.actor.avatarUrl, nickname: item.actor.nickname, size: 40)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: symbol(for: item))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(palette.accentOn)
+                        .frame(width: 18, height: 18)
+                        .background(palette.accent, in: .circle)
+                        .overlay { Circle().strokeBorder(palette.bg, lineWidth: 2) }
+                        .offset(x: 3, y: 3)
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(text(for: item))
-                    .font(Typography.bodyText)
+                    .font(unread ? Typography.subheadline : Typography.body)
                     .foregroundStyle(palette.textPrimary)
                 if let date = item.createdAt.isoDate {
-                    Text(date, format: .relative(presentation: .named))
+                    Text(date.casual())
                         .font(Typography.caption)
                         .foregroundStyle(palette.textSecondary)
                 }
@@ -100,9 +113,19 @@ struct NotificationsView: View {
             Spacer(minLength: 0)
 
             // 안 읽음 표시. 배지 대신 점 하나 — 개수가 아니라 여부만 말하면 되는 자리다.
-            if item.readAt == nil {
+            if unread {
                 Circle().fill(palette.brand).frame(width: 8, height: 8)
             }
+        }
+        .padding(.vertical, Spacing.x1)
+    }
+
+    private func symbol(for item: AppNotification) -> String {
+        switch item.type.known {
+        case .comment: return "bubble.left.fill"
+        case .reaction: return "heart.fill"
+        case .follow: return "person.fill"
+        case nil: return "bell.fill"
         }
     }
 
