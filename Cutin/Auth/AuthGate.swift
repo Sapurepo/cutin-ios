@@ -16,8 +16,9 @@ struct AuthGate: View {
      * 도움말이 재설치 후 한 번 더 뜨는 것은 사고가 아니다. 재열람은 프로필의 도움말 메뉴다. */
     @AppStorage("tips.seen") private var hasSeenTips = false
 
-    /* 인트로가 끝났는지. `restore()`가 인트로보다 먼저 끝나도 연출은 끝까지 가고, 늦게 끝나면
-     * 인트로가 (짧게) 더 머문다 — 어느 쪽이든 빈 화면은 없다. 앱 수명 동안 한 번만 false다. */
+    /* 인트로가 끝났는지. 인트로는 **고정 길이**다 — `restore()`가 먼저 끝나도 연출은 끝까지 가고,
+     * 늦게 끝나도 인트로가 기다려 주지 않는다(서버가 1초 넘게 걸리면 그 뒤로 빈 배경이 잠깐 —
+     * `IntroView` 머리말의 "최대 1초"). 앱 수명 동안 한 번만 false다. */
     @State private var isIntroDone = false
 
     var body: some View {
