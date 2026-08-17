@@ -42,14 +42,20 @@ struct OnboardingView: View {
 
     private var trimmed: String { nickname.trimmingCharacters(in: .whitespaces) }
 
+    /* 위에서부터 읽는 순서대로 쌓는다 — 제목 → 사진 → 이름 → 시작. 0.3.0은 가운데 정렬로
+     * 요소가 큰 빈 공간을 두고 흩어져 있었다(0.4.0 감사). 남는 공간은 아래 한 곳에만 둔다.
+     * 키보드가 올라오면 그 공간이 먼저 줄어들고 CTA는 키보드 위에 붙는다. */
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer()
-            heading
-            avatar.padding(.top, Spacing.x6)
-            field.padding(.top, Spacing.x5)
+            heading.padding(.top, Spacing.x8)
+            avatar.padding(.top, Spacing.x8)
+            field.padding(.top, Spacing.x6)
             hintLine.padding(.top, Spacing.x2)
-            Spacer()
+            Text("이름은 나중에 프로필에서 바꿀 수 있어요")
+                .font(Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+                .padding(.top, Spacing.x1)
+            Spacer(minLength: Spacing.x6)
             if let failure = session.failure { failureNotice(failure) }
             startButton.padding(.top, Spacing.x3)
             Spacer().frame(height: Spacing.x8)
@@ -65,12 +71,11 @@ struct OnboardingView: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
-            // 이 크기를 쓰는 곳이 여기뿐이라 토큰으로 승격하지 않는다(호출부 2곳 규칙).
             Text("어떻게 불러드릴까요?")
-                .font(Typography.font(.body, .bold, size: 22))
+                .font(Typography.largeTitle)
                 .foregroundStyle(palette.textPrimary)
-            Text("컷을 남기면 이 이름으로 보여요")
-                .font(Typography.bodyText)
+            Text("컷을 남기면 친구에게 이 이름으로 보여요")
+                .font(Typography.body)
                 .foregroundStyle(palette.textSecondary)
         }
     }
@@ -87,6 +92,8 @@ struct OnboardingView: View {
         return nil
     }
 
+    /* 입력칸은 떠 있는 면(`raised`) 위에, 포커스는 웜 테두리 — "지금 켜져 있는 것"의 색이다.
+     * 사용 불가 판정만 danger로 바뀐다. */
     private var field: some View {
         TextField("닉네임", text: $nickname)
             .font(Typography.headline)
@@ -97,15 +104,17 @@ struct OnboardingView: View {
             .submitLabel(.done)
             .onSubmit(submit)
             .padding(Spacing.x4)
-            .background(palette.surface, in: .rect(cornerRadius: Radius.md))
-            .tokenBorder(RoundedRectangle(cornerRadius: Radius.md), color: borderColor)
+            .raised(cornerRadius: Radius.md)
+            .tokenBorder(RoundedRectangle(cornerRadius: Radius.md), color: borderColor,
+                         lineWidth: isFocused ? 1.5 : 1)
+            .animation(Motion.quick, value: isFocused)
     }
 
     /* 확인 결과 한 줄. 자리를 항상 차지하게 두어 문구가 나타날 때 아래가 밀리지 않는다.
      * 확인 중에는 이전 결과를 지운다 — 옛 판정을 새 입력에 대한 답처럼 보여주면 안 된다. */
     private var hintLine: some View {
         Text(hint)
-            .font(Typography.caption)
+            .font(Typography.label)
             .foregroundStyle(hintColor)
             .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
             .animation(.easeOut(duration: Duration.fast), value: hint)
@@ -180,12 +189,12 @@ struct OnboardingView: View {
 
     private var hintColor: Color {
         guard let availability, !isChecking else { return palette.textSecondary }
-        return availability.available ? palette.textSecondary : palette.danger
+        return availability.available ? palette.brandInk : palette.danger
     }
 
     private var borderColor: Color {
         guard let availability, !isChecking, !availability.available else {
-            return isFocused ? palette.borderStrong : palette.border
+            return isFocused ? palette.brand : palette.border
         }
         return palette.danger
     }
