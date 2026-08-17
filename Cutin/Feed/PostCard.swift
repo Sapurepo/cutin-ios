@@ -82,20 +82,24 @@ struct PostThumbnail: View {
 
     @Environment(\.palette) private var palette
 
+    /* 정사각 **자리를 먼저 잡고** 이미지는 overlay로 얹는다. ZStack에 `scaledToFill` 이미지를
+     * 넣으면 이미지가 자기 비율대로 자리를 넓혀 셀 밖으로 넘치고, 옆 셀과 겹치며 핀 배지를
+     * 가린다(2026-08-17 감사 B2 — 세로 컷이 많은 프로필에서 셀 높이가 제각각이었다). */
     var body: some View {
-        ZStack {
-            Rectangle().fill(palette.surfaceSunken)
-            if let url = post.gridImageURL {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color.clear
+        Rectangle()
+            .fill(palette.surfaceSunken)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let url = post.gridImageURL {
+                    AsyncImage(url: url) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Color.clear
+                    }
                 }
             }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .clipped()
-        .overlay(alignment: .topTrailing) {
+            .clipped()
+            .overlay(alignment: .topTrailing) {
             if post.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .semibold))
@@ -113,10 +117,14 @@ extension Post {
     /// 파싱은 `String.isoDate`가 한다 — 알림 목록도 같은 형식을 읽는다.
     var displayDate: Date? { (publishedAt ?? createdAt).isoDate }
 
-    /* 대표 컷을 **직접 지정**했는지(§6.3). 미지정(첫 컷 기본)과 구분한다 — 지정한 것만
-     * 프로필 그리드 맨 앞에 고정된다. 여기서 nil 검사만 하는 이유: 어느 컷인지는 아래
-     * `gridImageURL`이 해석하고, 고정 여부는 지정 사실 자체다. */
-    var isPinned: Bool { thumbnailCutIndex != nil }
+    /* 대표 컷을 **직접 지정**했는지(§6.3) — 지정한 것만 프로필 그리드 맨 앞에 고정된다.
+     *
+     * nil 검사가 아니다. 서버가 발행 시 `thumbnailCutIndex`를 `?? 0`으로 채우므로 발행된
+     * 포스트는 **항상 non-null**이고, nil로 가르면 전부 핀이 붙는다(2026-08-17 감사 B3 —
+     * 0.3.0 하니스는 스텁이 null을 줘서 못 잡았다). 관찰 가능한 계약은 "0 = 기본(첫 컷)"뿐이라
+     * 첫 컷을 직접 골라도 기본과 같은 것으로 본다 — 어차피 같은 그림이다. 서버가 미지정을
+     * null로 남기게 되면(cutin-backend#13) 그때 nil 검사로 돌아간다. */
+    var isPinned: Bool { (thumbnailCutIndex ?? 0) != 0 }
 
     /* 그리드 셀에 그릴 이미지 — 대표 컷(미지정이면 첫 컷, 서버 기본과 같다).
      *

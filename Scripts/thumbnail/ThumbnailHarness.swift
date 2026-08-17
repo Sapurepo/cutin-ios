@@ -60,8 +60,12 @@ enum ThumbnailHarness {
         expect(bare.gridImageURL == nil, "아무것도 없으면 nil",
                bare.gridImageURL?.absoluteString ?? "nil")
 
-        expect(post(cutIndexes: [0], thumbnail: 0).isPinned, "지정하면 고정")
+        expect(post(cutIndexes: [0, 1], thumbnail: 1).isPinned, "첫 컷이 아닌 것을 지정하면 고정")
         expect(!post(cutIndexes: [0], thumbnail: nil).isPinned, "미지정은 고정이 아니다")
+        /* 서버는 발행 시 미지정을 0으로 채운다 — 발행된 포스트는 전부 non-null이다. nil 검사로
+         * 가르면 전 셀에 핀이 붙는다(2026-08-17 감사 B3). 0은 기본과 같은 그림이라 고정이 아니다. */
+        expect(!post(cutIndexes: [0, 1], thumbnail: 0).isPinned,
+               "0은 서버가 채우는 기본 — 고정이 아니다")
     }
 
     // MARK: - ② pinnedFirst
@@ -71,11 +75,11 @@ enum ThumbnailHarness {
 
         // 발행 순서: A(고정) B C(고정) D E(고정). 기대: A C E B D — 그룹 안은 그대로.
         let mixed = [
-            post(name: "A", cutIndexes: [0], thumbnail: 0),
-            post(name: "B", cutIndexes: [0], thumbnail: nil),
-            post(name: "C", cutIndexes: [0], thumbnail: 0),
-            post(name: "D", cutIndexes: [0], thumbnail: nil),
-            post(name: "E", cutIndexes: [0], thumbnail: 0),
+            post(name: "A", cutIndexes: [0, 1], thumbnail: 1),
+            post(name: "B", cutIndexes: [0, 1], thumbnail: 0),
+            post(name: "C", cutIndexes: [0, 1], thumbnail: 1),
+            post(name: "D", cutIndexes: [0, 1], thumbnail: nil),
+            post(name: "E", cutIndexes: [0, 1], thumbnail: 1),
         ]
         let ordered = Post.pinnedFirst(mixed).map(\.caption)
         expect(ordered == ["A", "C", "E", "B", "D"],
@@ -88,8 +92,8 @@ enum ThumbnailHarness {
         expect(Post.pinnedFirst(none).map(\.caption) == ["A", "B"],
                "고정이 없으면 그대로")
 
-        let all = [post(name: "A", cutIndexes: [0], thumbnail: 0),
-                   post(name: "B", cutIndexes: [0], thumbnail: 0)]
+        let all = [post(name: "A", cutIndexes: [0, 1], thumbnail: 1),
+                   post(name: "B", cutIndexes: [0, 1], thumbnail: 1)]
         expect(Post.pinnedFirst(all).map(\.caption) == ["A", "B"],
                "전부 고정이어도 순서 그대로 — 고정끼리는 발행 순이다")
     }

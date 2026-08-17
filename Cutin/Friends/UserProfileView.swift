@@ -106,14 +106,21 @@ struct UserProfileView: View {
 
     /* 버튼 문구가 관계를 말한다. **"팔로우"와 "맞팔로우"를 가르는 이유**: 상대가 이미 나를
      * 팔로우 중이면 누르는 순간 친구가 된다 — 그 결과를 미리 알려주는 편이 정직하다. */
+    /* 이미 팔로우 중이면 **채우지 않은** 글래스다. 전에는 prominent에 tint만 surface로 줬는데,
+     * prominent의 라벨색은 흰색이라 라이트 모드에서 흰 알약 위의 흰 글씨가 됐다
+     * (2026-08-17 감사 B1). 채움 여부가 곧 "누르면 관계가 생긴다/끊긴다"를 가른다. */
+    @ViewBuilder
     private func followButton(_ profile: PublicProfile) -> some View {
-        Button {
+        let button = Button {
             Task { await toggleFollow() }
         } label: {
             Text(label(for: profile)).primaryGlassLabel()
         }
-        .primaryGlassButton(tint: profile.following ? palette.surface : palette.accent)
-        .padding(.horizontal, Spacing.x8)
+        if profile.following {
+            button.buttonStyle(.glass).padding(.horizontal, Spacing.x8)
+        } else {
+            button.primaryGlassButton(tint: palette.accent).padding(.horizontal, Spacing.x8)
+        }
     }
 
     private func label(for profile: PublicProfile) -> String {

@@ -19,6 +19,13 @@ PRODUCT_BUNDLE_IDENTIFIER = com.sapurepo.cutin
 PRODUCT_NAME = $(TARGET_NAME)
 SWIFT_EMIT_LOC_STRINGS = YES
 
+// 앱의 언어는 한국어 하나다. 이 값이 생성되는 Info.plist의 CFBundleDevelopmentRegion이 되고
+// (Info.plist 파일에 같은 키를 써도 생성 값이 이긴다), lproj 없이도 개발 언어는 지원 언어로
+// 친다. en이면 앱 로케일이 en으로 잡혀 한국 기기에서도 날짜·상대시간이 "Aug 17, 2026" ·
+// "6 minutes ago"로 나온다(2026-08-17 감사 B4). pbxproj의 developmentRegion은 건드리지 않는다 —
+// 그 파일은 릴리즈 준비 브랜치만 만진다.
+DEVELOPMENT_LANGUAGE = ko
+
 // 각 브랜치가 자기 파일을 6-clean하게 쓰고 여기서 한 번에 플립한다 (계획 "Swift 6 전환 전략").
 // 철수 조건: 플립 후 하루 초과로 막히면 5.0 복귀(이 한 줄) 후 0.2.0 첫 브랜치로.
 SWIFT_VERSION = 6.0
