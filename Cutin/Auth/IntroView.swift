@@ -87,7 +87,7 @@ struct IntroView: View {
                 guard petal.id == AppMark.petals.count - 1 else { return }
                 Task {
                     try? await Task.sleep(for: .seconds(delay))
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Haptics.light()
                 }
             }
         }

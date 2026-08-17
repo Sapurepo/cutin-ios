@@ -67,6 +67,7 @@ struct FeedView: View {
                     }
                 }
         }
+        .accessibilityLabel(notifications.unread > 0 ? "알림, 안 읽은 알림 있음" : "알림")
     }
 }
 

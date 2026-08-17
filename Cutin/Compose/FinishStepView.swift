@@ -169,7 +169,10 @@ struct FinishStepView: View {
     private func save() {
         isCaptionFocused = false
         Task {
-            if await flow.commit(with: publisher, to: store) { onSaved() }
+            if await flow.commit(with: publisher, to: store) {
+                Haptics.success()   // 올라갔다 — 화면이 바로 닫히므로 손끝이 알려 준다
+                onSaved()
+            }
         }
     }
 }

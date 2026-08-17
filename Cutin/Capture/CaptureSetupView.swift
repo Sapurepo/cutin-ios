@@ -46,6 +46,8 @@ struct CaptureSetupView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(palette.bg)
         .navigationTitle("촬영")
+        // 인라인 — 큰 제목은 큰 글씨 설정에서 첫 절 제목과 겹쳤고, 다른 화면도 전부 인라인이다.
+        .navigationBarTitleDisplayMode(.inline)
         .task { await catalog.loadIfNeeded() }
     }
 

@@ -61,6 +61,7 @@ struct UserProfileView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                 }
+                .accessibilityLabel("더보기")
             }
         }
         .confirmationDialog("이 사람을 차단할까요?", isPresented: $isConfirmingBlock,

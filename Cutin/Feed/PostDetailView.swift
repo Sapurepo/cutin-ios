@@ -111,6 +111,7 @@ struct PostDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                 }
+                .accessibilityLabel("더보기")
             }
         }
         .sheet(isPresented: $isReporting) {
@@ -203,6 +204,7 @@ struct PostDetailView: View {
 
     private func react(_ post: Post, _ type: ReactionType) async {
         notice = nil
+        Haptics.light()
         do {
             try await store.react(id: post.id, type: type)
         } catch {
