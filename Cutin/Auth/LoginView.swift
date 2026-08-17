@@ -46,20 +46,23 @@ struct LoginView: View {
     }
 
     /* 스트립 두 장이 겹쳐 놓인 모양 — 포토부스에서 막 뽑아 든 것처럼. 등장할 때 살짝 벌어지며
-     * 자리를 잡는다(한 번, 0.5초). 움직임 줄이기가 켜져 있으면 처음부터 놓인 상태다. */
+     * 자리를 잡는다(한 번, 0.5초). 움직임 줄이기가 켜져 있으면 처음부터 놓인 상태다.
+     *
+     * 스트립 폭 104 → 높이 약 306, 기울여도 330 안쪽. 히어로 자리는 최대 360이고 화면이 낮으면
+     * (SE 계열 667pt) 스페이서부터 줄어 로고·버튼이 밀려나지 않는다. */
     private var hero: some View {
         ZStack {
-            StripArt(layout: .strip4, skin: .lavender, width: 118)
+            StripArt(layout: .strip4, skin: .lavender, width: 100)
                 .rotationEffect(.degrees(isSettled ? 9 : 2))
-                .offset(x: isSettled ? 54 : 12, y: isSettled ? 10 : 0)
+                .offset(x: isSettled ? 48 : 10, y: isSettled ? 8 : 0)
                 .shadow(color: .black.opacity(0.10), radius: 18, y: 10)
-            StripArt(layout: .strip4, skin: .white, width: 124)
+            StripArt(layout: .strip4, skin: .white, width: 104)
                 .rotationEffect(.degrees(isSettled ? -6 : -1))
-                .offset(x: isSettled ? -30 : -6)
+                .offset(x: isSettled ? -26 : -5)
                 .shadow(color: .black.opacity(0.14), radius: 22, y: 12)
         }
-        .frame(height: 400)
         .frame(maxWidth: .infinity)
+        .frame(minHeight: 300, maxHeight: 360)
         .accessibilityHidden(true)
     }
 
