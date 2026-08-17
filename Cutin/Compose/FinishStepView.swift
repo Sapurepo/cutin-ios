@@ -32,7 +32,8 @@ struct FinishStepView: View {
             Spacer(minLength: 0)
 
             Button(action: save) {
-                Text(publisher.step.label ?? "저장").primaryGlassLabel()
+                // "저장"이 아니라 "올리기" — 이 버튼은 서버에 발행한다(0.4.0 감사).
+                Text(publisher.step.label ?? "올리기").primaryGlassLabel()
             }
             .primaryGlassButton(tint: palette.accent)
             .disabled(publisher.isPublishing || flow.cuts.isEmpty)
@@ -41,8 +42,7 @@ struct FinishStepView: View {
         .padding(.top, Spacing.x4)
         .padding(.bottom, Spacing.x6)
         .background(palette.bg)
-        .navigationTitle("마무리")
-        .navigationBarTitleDisplayMode(.inline)
+        .editStepTitle("마무리", step: 3)
         .toolbar {
             /* 캡션은 여러 줄이라 Return이 줄바꿈이다. 키보드를 접을 길이 없으면 사용자는
              * 미리보기도 실패 문구도 보지 못한 채로 남는다. */
@@ -56,7 +56,7 @@ struct FinishStepView: View {
     private var captionField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("캡션")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             TextField("한 줄 남기기", text: $flow.caption, axis: .vertical)
                 .font(Typography.bodyText)
@@ -80,7 +80,7 @@ struct FinishStepView: View {
     private var thumbnailField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("대표 컷")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             HStack(spacing: Spacing.x2) {
                 ForEach(Array(flow.cuts.enumerated()), id: \.offset) { index, cut in
@@ -133,7 +133,7 @@ struct FinishStepView: View {
     private var visibilityField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("공개 범위")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             HStack(spacing: Spacing.x2) {
                 ForEach(PostVisibility.allCases, id: \.self) { option in

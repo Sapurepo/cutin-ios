@@ -176,24 +176,39 @@ struct CaptureView: View {
 
     private var permissionBox: some View {
         VStack(spacing: Spacing.x4) {
-            Text("컷 촬영을 위해\n카메라 권한이 필요해요")
-                .font(Typography.buttonLabel)
+            Image(systemName: "camera")
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.white.opacity(0.7))
+            Text("컷을 찍으려면\n카메라를 열어야 해요")
+                .font(Typography.title)
                 .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Text(camera.permission == .denied
+                 ? "설정에서 카메라를 허용하면 바로 찍을 수 있어요"
+                 : "허용을 누르면 지금 찍을 수 있어요")
+                .font(Typography.body)
+                .foregroundStyle(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
 
             if camera.permission == .denied {
                 // iOS는 한 번 거부된 뒤 앱이 다시 묻는 것을 허용하지 않는다.
-                Button("설정에서 허용") {
+                Button {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     UIApplication.shared.open(url)
+                } label: {
+                    Text("설정에서 허용").glassLabel().foregroundStyle(Palette.light.accent)
                 }
-                .buttonStyle(.glass)
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
             } else {
-                Button("카메라 권한 허용") { camera.start() }
-                    .primaryGlassButton(tint: .white, label: Palette.light.accent)
+                Button {
+                    camera.start()
+                } label: {
+                    Text("카메라 허용").glassLabel().foregroundStyle(Palette.light.accent)
+                }
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
             }
         }
-        .padding(Spacing.x6)
+        .padding(Spacing.x8)
         .tint(.white)
     }
 
@@ -218,9 +233,9 @@ struct CaptureView: View {
                                 .scaledToFill()
                         }
                     }
-                    .frame(width: 40, height: 40)
-                    .clipShape(.rect(cornerRadius: 8))
-                    .tokenBorder(RoundedRectangle(cornerRadius: 8),
+                    .frame(width: 48, height: 48)
+                    .clipShape(.rect(cornerRadius: Radius.sm))
+                    .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
                                  color: isRetake || isNext ? Color.white : ink.borderStrong,
                                  lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1))
                 }
@@ -250,18 +265,22 @@ struct CaptureView: View {
         flow.retakeIndex != nil || flow.cuts.count < flow.cutCount
     }
 
+    /* 셔터 — 흰 링 안의 흰 원. 카메라 앱의 문법 그대로라 설명이 필요 없다. 누를 수 없을 때는
+     * 링만 남긴다(원이 빠진다) — 흐려진 원보다 "지금은 안 된다"가 분명하다. */
     private var shutterRow: some View {
         Button(action: onShutter) {
-            Circle()
-                .fill(.white)
-                .frame(width: 72, height: 72)
-                .overlay {
-                    Circle().stroke(.white.opacity(0.35), lineWidth: 4)
-                }
+            ZStack {
+                Circle().strokeBorder(.white, lineWidth: 3.5)
+                    .frame(width: 76, height: 76)
+                Circle().fill(.white)
+                    .frame(width: 60, height: 60)
+                    .scaleEffect(canShoot ? 1 : 0.001)
+                    .opacity(canShoot ? 1 : 0)
+            }
+            .animation(Motion.quick, value: canShoot)
         }
         .buttonStyle(.plain)
         .disabled(!canShoot)
-        .opacity(canShoot ? 1 : 0.4)
         .accessibilityLabel("촬영")
         .padding(.top, Spacing.x2)
         .padding(.bottom, Spacing.x8)
