@@ -28,9 +28,10 @@ struct LoginView: View {
             Spacer(minLength: Spacing.x8)
             kakaoButton
             if let failure = session.failure {
+                // 실패는 실패 색이다 — 온보딩의 같은 상태(`failureNotice`)와 같은 대우.
                 Text(failure)
                     .font(Typography.caption)
-                    .foregroundStyle(palette.textSecondary)
+                    .foregroundStyle(palette.danger)
                     .multilineTextAlignment(.center)
                     .padding(.top, Spacing.x3)
             }

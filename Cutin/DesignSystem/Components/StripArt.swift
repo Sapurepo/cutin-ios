@@ -63,7 +63,8 @@ struct StripArt: View {
             HStack {
                 Text("CUTIN").font(Typography.logo(size: width * 0.05)).kerning(width * 0.05 * Typography.logoKerning)
                 Spacer()
-                Text("2026.08.17").font(Typography.font(.latin, .regular, size: width * 0.04))
+                // 오늘 날짜 — 합성기의 푸터와 같은 형식(yyyy.MM.dd). "방금 뽑은 스트립"이라 오늘이다.
+                Text(Self.stamp.string(from: .now)).font(Typography.font(.latin, .regular, size: width * 0.04))
             }
             .foregroundStyle(skin.foreground)
             .padding(.horizontal, padding)
@@ -74,6 +75,12 @@ struct StripArt: View {
         .clipShape(.rect(cornerRadius: width * 0.02))
         .accessibilityHidden(true)
     }
+
+    private static let stamp: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd"
+        return formatter
+    }()
 
     private func slotFill(_ index: Int) -> AnyShapeStyle {
         if let filled, index >= filled {
