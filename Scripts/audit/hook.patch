@@ -17,29 +17,10 @@ index 737e6c3..2991a8a 100644
           * 액세스 토큰도 재발급 경로도 없어서 `/templates`(auth 필요)가 401로 끝난다. */
          let client = APIClient()
 diff --git a/Cutin/RootView.swift b/Cutin/RootView.swift
-index 6644f05..6bf0764 100644
+index 9f43ffe..70d2c85 100644
 --- a/Cutin/RootView.swift
 +++ b/Cutin/RootView.swift
-@@ -21,11 +21,18 @@ struct RootView: View {
- 
-     @State private var coordinator = AppCoordinator()
-     @State private var pendingIntent: CaptureIntent?
-+    #if DEBUG
-+    @State private var auditPath: [Route] = AuditHook.routes // AUDIT-HOOK
-+    #endif
- 
-     var body: some View {
-         TabView(selection: tabSelection) {
-             Tab(AppTab.home.title, systemImage: AppTab.home.systemImage, value: AppTab.home) {
-+                #if DEBUG
-+                NavigationStack(path: $auditPath) { FeedView() } // AUDIT-HOOK
-+                #else
-                 NavigationStack { FeedView() }
-+                #endif
-             }
- 
-             Tab(AppTab.friends.title, systemImage: AppTab.friends.systemImage, value: AppTab.friends) {
-@@ -64,6 +71,9 @@ struct RootView: View {
+@@ -75,6 +75,9 @@ struct RootView: View {
           * 셸이 뜰 때마다 다시 등록한다 — `PushRegistrar.registerIfAuthorized`가 이 호출
           * 하나로 배선된다(권한이 없으면 아무 일도 하지 않는다). */
          .task { await push.registerIfAuthorized() }

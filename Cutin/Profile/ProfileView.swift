@@ -147,22 +147,9 @@ struct ProfileView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(posts, id: \.id) { post in
-                    /* 짧게 누르면 상세, 길게 누르면 미리보기(`PostPeekView`). NavigationLink 대신
-                     * 제스처 둘을 직접 건다 — 링크 위에 길게 누르기를 얹으면 손을 뗄 때 링크까지
-                     * 눌려 상세가 같이 밀려 들어갔다. 경로는 코디네이터가 들고 있다. 컨텍스트 메뉴가
-                     * 아니라 팝업인 이유는 셀이 대표 컷 한 장뿐이라 "어느 포스트인지"부터 크게
-                     * 보여야 해서다. */
-                    PostThumbnail(post: post)
-                        .contentShape(.rect)
-                        .onTapGesture { coordinator.profilePath.append(.postDetail(post.id)) }
-                        .onLongPressGesture(minimumDuration: 0.35) { coordinator.peekPostId = post.id }
-                        // 제스처만으로는 VoiceOver가 누를 수 있는 것을 모른다 — 버튼 트레이트와
-                        // 미리보기 액션을 따로 준다(길게 누르기는 VoiceOver에 대응 제스처가 없다).
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(post.caption ?? "컷")
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { coordinator.profilePath.append(.postDetail(post.id)) }
-                        .accessibilityAction(named: "미리보기") { coordinator.peekPostId = post.id }
+                    PostGridCell(post: post,
+                                 onTap: { coordinator.push(.postDetail(post.id)) },
+                                 onLongPress: { coordinator.peekPostId = post.id })
                 }
 
                 if list.nextCursor != nil {

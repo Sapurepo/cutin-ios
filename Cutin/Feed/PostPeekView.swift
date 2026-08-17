@@ -1,7 +1,7 @@
-/* 포스트 미리보기 — 프로필 그리드에서 **길게 누르면** 뜨는 팝업.
+/* 포스트 미리보기 — 프로필(내 것·남의 것) 그리드에서 **길게 누르면** 뜨는 팝업.
  *
  * 그리드 셀은 대표 컷 한 장이라 어떤 포스트인지 다 보이지 않는다. 상세로 들어가지 않고 합성본과
- * 캡션을 크게 보고, 바로 아래 글래스 막대에서 자주 쓰는 동작(댓글 · 공유 · 보관 · 고정 해제)을
+ * 캡션을 크게 보고, 바로 아래 글래스 막대에서 자주 쓰는 동작(댓글 · 공유 · 보관 · 고정/고정 해제)을
  * 끝낸다. 뒤는 스크림이고 스크림을 누르면 닫힌다 — 팝업의 "밖"이 곧 닫기다.
  *
  * 탭 트리 위에 그린다(`RootView` overlay) — 그래야 탭바·내비게이션 바까지 어두워진다.
@@ -90,7 +90,7 @@ struct PostPeekView: View {
 
     // MARK: - 글래스 막대
 
-    /* 동작은 넷까지 — 댓글 · 공유 · 보관 · (내 것이고 고정돼 있으면) 고정 해제. 삭제·신고는
+    /* 동작은 넷까지 — 댓글 · 공유 · 보관 · (내 것이면) 고정 ↔ 고정 해제. 삭제·신고는
      * 여기 두지 않는다: 미리보기는 "잠깐 보고 한 번 누르는" 자리이지 되돌리기 어려운 결정을
      * 내리는 자리가 아니다. */
     private func bar(_ post: Post) -> some View {
@@ -103,8 +103,11 @@ struct PostPeekView: View {
                        systemImage: post.bookmarked ? "bookmark.fill" : "bookmark") {
                     Task { await toggleBookmark(post) }
                 }
-                if isMine, post.isPinned {
-                    action("고정 해제", systemImage: "pin.slash") { Task { await unpin(post) } }
+                if isMine {
+                    action(post.isPinned ? "고정 해제" : "고정",
+                           systemImage: post.isPinned ? "pin.slash" : "pin") {
+                        Task { await setPinned(post, !post.isPinned) }
+                    }
                 }
             }
             .padding(Spacing.x2)
@@ -130,16 +133,16 @@ struct PostPeekView: View {
 
     // MARK: - 동작
 
-    /// 카드 → 상세. 팝업은 닫는다.
+    /// 카드 → 상세. 팝업은 닫는다. 지금 보고 있는 탭의 스택에 밀어 넣는다(내 프로필이든 남의 프로필이든).
     private func openDetail(_ post: Post) {
         onClose()
-        coordinator.profilePath.append(.postDetail(post.id))
+        coordinator.push(.postDetail(post.id))
     }
 
     /// 댓글 → 상세를 **입력칸에 포커스한 채로**(`Route.postComments`). 댓글을 남기러 온 것이다.
     private func openComments(_ post: Post) {
         onClose()
-        coordinator.profilePath.append(.postComments(post.id))
+        coordinator.push(.postComments(post.id))
     }
 
     private func share(_ post: Post) async {
@@ -162,17 +165,18 @@ struct PostPeekView: View {
         }
     }
 
-    private func unpin(_ post: Post) async {
+    private func setPinned(_ post: Post, _ pinned: Bool) async {
         notice = nil
         isBusy = true
         defer { isBusy = false }
+        Haptics.light()
         do {
-            try await store.unpin(id: post.id)
+            try await store.setPinned(id: post.id, pinned)
         } catch let error as APIError {
             // 발행 후 수정을 아직 안 받는 서버는 POST_NOT_DRAFT를 낸다 — 사실대로 말한다.
-            notice = error.serverMessage ?? "고정을 풀지 못했어요"
+            notice = error.serverMessage ?? (pinned ? "고정하지 못했어요" : "고정을 풀지 못했어요")
         } catch {
-            notice = "고정을 풀지 못했어요"
+            notice = pinned ? "고정하지 못했어요" : "고정을 풀지 못했어요"
         }
     }
 }

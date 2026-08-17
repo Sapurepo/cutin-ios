@@ -25,11 +25,11 @@ struct RootView: View {
     var body: some View {
         TabView(selection: tabSelection) {
             Tab(AppTab.home.title, systemImage: AppTab.home.systemImage, value: AppTab.home) {
-                NavigationStack { FeedView() }
+                NavigationStack(path: $coordinator.homePath) { FeedView() }
             }
 
             Tab(AppTab.friends.title, systemImage: AppTab.friends.systemImage, value: AppTab.friends) {
-                NavigationStack { FriendsView() }
+                NavigationStack(path: $coordinator.friendsPath) { FriendsView() }
             }
 
             Tab(AppTab.capture.title, systemImage: AppTab.capture.systemImage, value: AppTab.capture) {
@@ -41,7 +41,7 @@ struct RootView: View {
             }
 
             Tab(AppTab.archive.title, systemImage: AppTab.archive.systemImage, value: AppTab.archive) {
-                NavigationStack { ArchiveView() }
+                NavigationStack(path: $coordinator.archivePath) { ArchiveView() }
             }
         }
         .fullScreenCover(isPresented: $coordinator.isCapturePresented) {

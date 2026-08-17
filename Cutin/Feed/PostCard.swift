@@ -161,19 +161,60 @@ struct PostThumbnail: View {
     }
 }
 
+/* 그리드 셀 하나의 **누름** — 내 프로필과 타인 프로필이 쓴다(호출부 2곳).
+ *
+ * 짧게 누르면 상세, 길게 누르면 미리보기. NavigationLink 대신 제스처를 직접 거는 이유는 링크 위에
+ * 길게 누르기를 얹으면 손을 뗄 때 링크까지 눌리기 때문이고, 그러면 버튼의 눌림 표시가 사라진다 —
+ * 그래서 눌림을 직접 그린다: 손가락이 닿아 있는 동안 흐려진다(피드 카드의 링크 눌림과 같은 감각).
+ * 흐려지는 것은 닿고 잠깐(80ms) 뒤부터 — 스크롤을 시작하는 손가락도 처음엔 셀 위에 닿으므로,
+ * 즉시 흐리면 스크롤할 때마다 깜빡인다(UIKit의 delaysContentTouches와 같은 이유).
+ * VoiceOver에는 버튼 트레이트와 "미리보기" 액션을 준다(길게 누르기는 대응 제스처가 없다). */
+struct PostGridCell: View {
+    let post: Post
+    let onTap: () -> Void
+    let onLongPress: () -> Void
+
+    @State private var isPressed = false
+    @State private var pressTask: Task<Void, Never>?
+
+    var body: some View {
+        PostThumbnail(post: post)
+            .contentShape(.rect)
+            .opacity(isPressed ? 0.55 : 1)
+            .animation(Motion.quick, value: isPressed)
+            .onTapGesture(perform: onTap)
+            .onLongPressGesture(minimumDuration: 0.35, maximumDistance: 12) {
+                onLongPress()
+            } onPressingChanged: { pressing in
+                pressTask?.cancel()
+                if pressing {
+                    pressTask = Task {
+                        try? await Task.sleep(for: .milliseconds(80))
+                        if !Task.isCancelled { isPressed = true }
+                    }
+                } else {
+                    isPressed = false
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(post.caption ?? "컷")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onTap() }
+            .accessibilityAction(named: "미리보기") { onLongPress() }
+    }
+}
+
 extension Post {
     /// 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
     /// 파싱은 `String.isoDate`가 한다 — 알림 목록도 같은 형식을 읽는다.
     var displayDate: Date? { (publishedAt ?? createdAt).isoDate }
 
-    /* 대표 컷을 **직접 지정**했는지(§6.3) — 지정한 것만 프로필 그리드 맨 앞에 고정된다.
+    /* 프로필 그리드 맨 앞에 고정됐는지(§6.3).
      *
-     * nil 검사가 아니다. 서버가 발행 시 `thumbnailCutIndex`를 `?? 0`으로 채우므로 발행된
-     * 포스트는 **항상 non-null**이고, nil로 가르면 전부 핀이 붙는다(2026-08-17 감사 B3 —
-     * 0.3.0 하니스는 스텁이 null을 줘서 못 잡았다). 관찰 가능한 계약은 "0 = 기본(첫 컷)"뿐이라
-     * 첫 컷을 직접 골라도 기본과 같은 것으로 본다 — 어차피 같은 그림이다. 서버가 미지정을
-     * null로 남기게 되면(cutin-backend#13) 그때 nil 검사로 돌아간다. */
-    var isPinned: Bool { (thumbnailCutIndex ?? 0) != 0 }
+     * 서버가 `pinned`를 주면 그것이 답이다(cutin-backend#14 — 대표 컷과 별개의 값). 그 전 서버에는
+     * 이 필드가 없어 대표 컷 인덱스로 가른다: 발행 시 미지정을 0으로 채우므로 0은 기본, 0이 아니면
+     * 직접 고른 것 = 고정(2026-08-17 감사 B3의 임시 규칙). 새 서버가 배포되면 이 폴백은 사라진다. */
+    var isPinned: Bool { pinned ?? ((thumbnailCutIndex ?? 0) != 0) }
 
     /* 그리드 셀에 그릴 이미지 — 대표 컷(미지정이면 첫 컷, 서버 기본과 같다).
      *

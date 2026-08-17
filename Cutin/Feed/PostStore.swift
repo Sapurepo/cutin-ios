@@ -198,13 +198,12 @@ final class PostStore {
         posts[id] = post.replacing(reactions: summary)
     }
 
-    /* 대표 컷 고정 해제(§6.3) — `thumbnailCutIndex`를 0(기본 = 첫 컷)으로. 앱은 0을 "지정 안 함"으로
-     * 보므로(`Post.isPinned`) 이것이 곧 해제다. 발행된 포스트의 PATCH는 서버가 이 필드만 허용한다
-     * (cutin-backend#14) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
+    /* 고정 켜기/끄기(§6.3) — `PATCH { pinned }`. 발행된 포스트의 PATCH는 서버가 이 필드(와 대표 컷)만
+     * 허용한다(cutin-backend#14) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
      * 서버가 돌려준 포스트로 사전을 갱신하므로 그리드 순서(`pinnedFirst`)가 곧바로 따라온다. */
-    func unpin(id: UUID) async throws {
+    func setPinned(id: UUID, _ pinned: Bool) async throws {
         var body = PatchPostBody()
-        body.thumbnailCutIndex = .value(0)
+        body.pinned = pinned
         merge([try await client.send(.patch, "/posts/\(id.path)", body: body, as: Post.self)])
     }
 
@@ -287,7 +286,7 @@ private extension Post {
         Post(
             id: id, author: author, template: template, frame: frame,
             status: status, visibility: visibility, caption: caption,
-            thumbnailCutIndex: thumbnailCutIndex, cuts: cuts, composed: composed,
+            thumbnailCutIndex: thumbnailCutIndex, pinned: pinned, cuts: cuts, composed: composed,
             publishedAt: publishedAt, createdAt: createdAt,
             commentCount: commentCount,
             reactions: reactions ?? self.reactions,
