@@ -19,6 +19,7 @@ struct ProfileView: View {
     @Environment(PostStore.self) private var store
     @Environment(AuthSession.self) private var session
     @Environment(PushRegistrar.self) private var push
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.palette) private var palette
 
     @State private var isEditingNickname = false
@@ -39,6 +40,9 @@ struct ProfileView: View {
     /// 직접 지정한 대표 컷이 있는 포스트를 맨 앞에 고정한다(§6.3 · 0.3.0 제품 결정).
     private var posts: [Post] { Post.pinnedFirst(list.ids.compactMap(store.post(id:))) }
 
+    /* 큰 제목이 아니라 **인라인 제목**이다. 큰 제목 + `refreshable` + 화면보다 짧은 내용의 조합에서
+     * 위로 밀면 제목이 반쯤 접힌 채 되돌아오지 않고, 실기기에서는 접힘/펼침이 반복되며 상단이
+     * 떨렸다(사용자 신고). 이름과 아바타가 이미 머리이므로 큰 제목 "프로필"은 잃을 것이 없다. */
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.x6) {
@@ -50,6 +54,7 @@ struct ProfileView: View {
         .refreshable { await reload(refresh: true) }
         .background(palette.bg)
         .navigationTitle(AppTab.profile.title)
+        .navigationBarTitleDisplayMode(.inline)
         .routeDestinations()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -104,7 +109,7 @@ struct ProfileView: View {
             } label: {
                 HStack(spacing: Spacing.x1) {
                     Text(profile?.nickname ?? "닉네임 정하기")
-                        .font(Typography.headline)
+                        .font(Typography.title)
                         .foregroundStyle(profile?.nickname == nil
                                          ? palette.textSecondary : palette.textPrimary)
                     Image(systemName: "pencil")
@@ -141,10 +146,15 @@ struct ProfileView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(posts, id: \.id) { post in
-                    NavigationLink(value: Route.postDetail(post.id)) {
-                        PostThumbnail(post: post)
-                    }
-                    .buttonStyle(.plain)
+                    /* 짧게 누르면 상세, 길게 누르면 미리보기(`PostPeekView`). NavigationLink 대신
+                     * 제스처 둘을 직접 건다 — 링크 위에 길게 누르기를 얹으면 손을 뗄 때 링크까지
+                     * 눌려 상세가 같이 밀려 들어갔다. 경로는 코디네이터가 들고 있다. 컨텍스트 메뉴가
+                     * 아니라 팝업인 이유는 셀이 대표 컷 한 장뿐이라 "어느 포스트인지"부터 크게
+                     * 보여야 해서다. */
+                    PostThumbnail(post: post)
+                        .contentShape(.rect)
+                        .onTapGesture { coordinator.profilePath.append(.postDetail(post.id)) }
+                        .onLongPressGesture(minimumDuration: 0.35) { coordinator.peekPostId = post.id }
                 }
 
                 if list.nextCursor != nil {

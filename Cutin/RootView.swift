@@ -37,7 +37,7 @@ struct RootView: View {
             }
 
             Tab(AppTab.profile.title, systemImage: AppTab.profile.systemImage, value: AppTab.profile) {
-                NavigationStack { ProfileView() }
+                NavigationStack(path: $coordinator.profilePath) { ProfileView() }
             }
 
             Tab(AppTab.archive.title, systemImage: AppTab.archive.systemImage, value: AppTab.archive) {
@@ -53,6 +53,17 @@ struct RootView: View {
         .sheet(isPresented: $coordinator.isDraftBlockPresented, onDismiss: runPendingIntent) {
             draftBlock
         }
+        /* 포스트 미리보기 — 탭바·내비게이션 바 위에 스크림째로 덮는다(`AppCoordinator.peekPostId`). */
+        .overlay {
+            if let id = coordinator.peekPostId {
+                PostPeekView(id: id) { coordinator.peekPostId = nil }
+                    .environment(\.palette, Palette.of(colorScheme))
+                    .transition(.opacity)
+                    .zIndex(2)
+            }
+        }
+        .animation(Motion.standard, value: coordinator.peekPostId)
+        .environment(coordinator)
         .environment(\.palette, Palette.of(colorScheme))
         .tint(Palette.of(colorScheme).accent)
         /* 템플릿 목록을 로그인 뒤 **미리** 받는다(`/templates`·`/frames`가 auth 필요).
