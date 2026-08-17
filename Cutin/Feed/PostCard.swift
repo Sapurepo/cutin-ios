@@ -166,6 +166,8 @@ struct PostThumbnail: View {
  * 짧게 누르면 상세, 길게 누르면 미리보기. NavigationLink 대신 제스처를 직접 거는 이유는 링크 위에
  * 길게 누르기를 얹으면 손을 뗄 때 링크까지 눌리기 때문이고, 그러면 버튼의 눌림 표시가 사라진다 —
  * 그래서 눌림을 직접 그린다: 손가락이 닿아 있는 동안 흐려진다(피드 카드의 링크 눌림과 같은 감각).
+ * 흐려지는 것은 닿고 잠깐(80ms) 뒤부터 — 스크롤을 시작하는 손가락도 처음엔 셀 위에 닿으므로,
+ * 즉시 흐리면 스크롤할 때마다 깜빡인다(UIKit의 delaysContentTouches와 같은 이유).
  * VoiceOver에는 버튼 트레이트와 "미리보기" 액션을 준다(길게 누르기는 대응 제스처가 없다). */
 struct PostGridCell: View {
     let post: Post
@@ -173,6 +175,7 @@ struct PostGridCell: View {
     let onLongPress: () -> Void
 
     @State private var isPressed = false
+    @State private var pressTask: Task<Void, Never>?
 
     var body: some View {
         PostThumbnail(post: post)
@@ -183,7 +186,15 @@ struct PostGridCell: View {
             .onLongPressGesture(minimumDuration: 0.35, maximumDistance: 12) {
                 onLongPress()
             } onPressingChanged: { pressing in
-                isPressed = pressing
+                pressTask?.cancel()
+                if pressing {
+                    pressTask = Task {
+                        try? await Task.sleep(for: .milliseconds(80))
+                        if !Task.isCancelled { isPressed = true }
+                    }
+                } else {
+                    isPressed = false
+                }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(post.caption ?? "컷")

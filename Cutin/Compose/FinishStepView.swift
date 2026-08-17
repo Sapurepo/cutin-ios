@@ -91,9 +91,6 @@ struct FinishStepView: View {
         }
     }
 
-    /// 고른 컷이 고정을 만드는지 — 어느 컷이든 고르면 고정이다(발행 요청의 `pinned`).
-    private func pins(_ index: Int) -> Bool { true }
-
     private var thumbnailHint: String {
         flow.thumbnailCutIndex == nil
             ? "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
@@ -114,7 +111,8 @@ struct FinishStepView: View {
                              color: selected ? palette.brand : palette.border,
                              lineWidth: selected ? 2 : 1)
                 .overlay(alignment: .topTrailing) {
-                    if selected && pins(index) {
+                    // 고른 컷에 핀 — 어느 컷이든 고르면 고정이다(발행 요청의 `pinned`).
+                    if selected {
                         Image(systemName: "pin.circle.fill")
                             .font(.system(size: 15))
                             .foregroundStyle(palette.brand)

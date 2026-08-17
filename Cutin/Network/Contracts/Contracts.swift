@@ -287,7 +287,7 @@ struct Post: Decodable, Sendable, Hashable {
     let thumbnailCutIndex: Int?
     /* 프로필 그리드 맨 앞 고정(§6.3). 대표 컷과 **별개**의 값이다(cutin-backend#14).
      * 옵셔널인 이유: 그 전 서버는 이 필드가 없다 — 그때는 `isPinned`가 대표 컷 인덱스로 가른다. */
-    var pinned: Bool?
+    let pinned: Bool?
     let cuts: [PostCut]
     /// **iOS가 만든 합성본.** draft에는 없으므로 null이다 — required이면서 nullable이다.
     let composed: Media?
