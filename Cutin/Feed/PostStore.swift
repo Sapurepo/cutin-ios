@@ -200,7 +200,7 @@ final class PostStore {
 
     /* 대표 컷 고정 해제(§6.3) — `thumbnailCutIndex`를 0(기본 = 첫 컷)으로. 앱은 0을 "지정 안 함"으로
      * 보므로(`Post.isPinned`) 이것이 곧 해제다. 발행된 포스트의 PATCH는 서버가 이 필드만 허용한다
-     * (cutin-backend#13) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
+     * (cutin-backend#14) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
      * 서버가 돌려준 포스트로 사전을 갱신하므로 그리드 순서(`pinnedFirst`)가 곧바로 따라온다. */
     func unpin(id: UUID) async throws {
         var body = PatchPostBody()

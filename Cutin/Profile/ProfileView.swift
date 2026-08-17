@@ -155,6 +155,13 @@ struct ProfileView: View {
                         .contentShape(.rect)
                         .onTapGesture { coordinator.profilePath.append(.postDetail(post.id)) }
                         .onLongPressGesture(minimumDuration: 0.35) { coordinator.peekPostId = post.id }
+                        // 제스처만으로는 VoiceOver가 누를 수 있는 것을 모른다 — 버튼 트레이트와
+                        // 미리보기 액션을 따로 준다(길게 누르기는 VoiceOver에 대응 제스처가 없다).
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(post.caption ?? "컷")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { coordinator.profilePath.append(.postDetail(post.id)) }
+                        .accessibilityAction(named: "미리보기") { coordinator.peekPostId = post.id }
                 }
 
                 if list.nextCursor != nil {
