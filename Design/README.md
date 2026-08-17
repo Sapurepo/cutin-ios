@@ -42,7 +42,9 @@
 | 3e | 알림·설정·보관·빈 상태 전부 | PR | 1일 |
 | 4 | 폴리시 — 전환·햅틱·런치 스크린·접근성(VoiceOver·대비·Dynamic Type 극단값) · **after 콘택트 시트** | PR + `audit-<날짜>-after` | 1~2일 |
 
-각 PR: 같은 데이터로 찍은 before/after를 본문에, 라이트/다크 둘 다. 한 세션 = 한 화면 묶음.
+각 PR: 같은 데이터로 찍은 before/after를 `Design/stages/<단계>.jpg`로 남긴다(라이트/다크 둘 다). 한 세션 = 한 화면 묶음.
+
+- 2단계: [stages/2-design-system.jpg](stages/2-design-system.jpg)
 
 ## 토큰 요약 (진실은 `Cutin/DesignSystem/`)
 
