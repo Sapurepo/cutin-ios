@@ -162,6 +162,7 @@ struct CommentComposer: View {
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
+            .accessibilityLabel("보내기")
             .animation(Motion.quick, value: canSend)
         }
         .padding(.horizontal, Spacing.x4)

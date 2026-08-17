@@ -45,7 +45,7 @@ struct CaptureView: View {
 
     private var topBar: some View {
         HStack {
-            iconButton("xmark") {
+            iconButton("xmark", label: "닫기") {
                 countdownTask?.cancel()
                 dismiss()
             }
@@ -55,7 +55,7 @@ struct CaptureView: View {
                 .padding(.vertical, Spacing.x1)
                 .glassEffect(.regular, in: .capsule)
             Spacer()
-            iconButton("arrow.trianglehead.2.clockwise.rotate.90.camera") {
+            iconButton("arrow.trianglehead.2.clockwise.rotate.90.camera", label: "카메라 전환") {
                 camera.toggleFacing()
             }
         }
@@ -63,13 +63,14 @@ struct CaptureView: View {
         .padding(.vertical, Spacing.x3)
     }
 
-    private func iconButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: Layout.tapTarget, height: Layout.tapTarget)
         }
+        .accessibilityLabel(label)
     }
 
     // MARK: - 뷰파인더
@@ -325,6 +326,7 @@ struct CaptureView: View {
 
         do {
             flow.addCut(try await camera.capturePhoto())
+            Haptics.medium()   // 찍혔다 — 셔터음이 꺼진 기기에서 이것이 유일한 확인이다
             return true
         } catch CameraController.CaptureError.cancelled {
             // 화면을 벗어났거나 전/후면을 바꿨다 — 사용자에게 알릴 실패가 아니다.

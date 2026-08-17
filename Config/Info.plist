@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 런치 스크린 배경 = 팔레트 bg(라이트 #FAFAF8 · 다크 #0A0A0B). 시스템 기본(순백/순흑)이면 인트로가
+	     뜨는 순간 배경이 한 단 바뀌며 번쩍인다. 색은 Assets의 LaunchBackground. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>CutinAPIBaseURL</key>
 	<string>$(CUTIN_API_BASE_URL)</string>
 	<key>KAKAO_APP_KEY</key>

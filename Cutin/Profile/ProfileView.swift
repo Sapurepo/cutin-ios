@@ -69,6 +69,7 @@ struct ProfileView: View {
                 } label: {
                     Image(systemName: "gearshape")
                 }
+                .accessibilityLabel("설정")
             }
         }
         .alert("닉네임", isPresented: $isEditingNickname) {

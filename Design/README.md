@@ -4,6 +4,7 @@
 코드가 아니라 결정을 적습니다 — 코드는 `Cutin/DesignSystem/`이 진실이고, 여기는 왜 그렇게 했는지.
 
 - 기준선: [감사 2026-08-17](audit-2026-08-17.md) · 콘택트 시트 [라이트](audit-2026-08-17-light.jpg) / [다크](audit-2026-08-17-dark.jpg)
+- **after**(같은 시드·같은 절차, 0.4.0 개편 뒤): [라이트](audit-2026-08-17-after-light.jpg) / [다크](audit-2026-08-17-after-dark.jpg)
 - 다시 찍는 법: `Scripts/audit/README.md`
 
 ## 원칙 셋
@@ -42,7 +43,7 @@
 | 3c | 촬영 5화면 — 설정에 **배치 미리보기**(`TemplateGlyph`, 기본 네 컷) · 편집 3단계 제목에 "n / 3"(`editStepTitle`) · 배치 칩에 글리프 · 보정 타일에 **첫 컷 미리보기** · 마무리 CTA "올리기" · 카메라 셔터 링/권한 안내 | ✅ PR #48 | — |
 | 3d | 프로필·타인 프로필·친구 — 이름 `title` · 친구 수 `label` · 행 아바타 40 + `subheadline` · 친구 탭 인라인 제목 · 아바타 지우기는 길게 눌러(상시 노출 제거). 떨림·미리보기·고정 해제는 #45 | ✅ PR #49 | — |
 | 3e | 알림·보관·빈 상태 — 알림 행에 종류 배지(아바타 모서리) · 안 읽은 것은 굵게 · 사람 말 시각. `EmptyStateView` 재설계(옅은 면 위 심볼, 화면이 자기 그림을 넘길 수 있음 — 빈 피드는 빈 스트립). 피드 로딩은 스켈레톤. 피드 헤더는 인라인 **Geist 워드마크**, 보관도 인라인(G2 마무리). 알림 설정은 그대로 | ✅ PR #50 | — |
-| 4 | 폴리시 — 전환·햅틱·런치 스크린·접근성(VoiceOver·대비·Dynamic Type 극단값) · **after 콘택트 시트** | PR + `audit-<날짜>-after` | 1~2일 |
+| 4 | 폴리시 — 햅틱 셋으로 통일(`Haptics`: 반응·셔터·인트로·미리보기) · 런치 스크린 배경 = 팔레트 bg(라이트/다크) · VoiceOver 라벨(종·톱니·더보기·닫기·카메라 전환·보내기) · 큰 글씨 점검(accessibility-large에서 6화면, 촬영 설정 큰 제목 겹침 → 인라인) · 버전 0.4.0 · **after 콘택트 시트** | ✅ PR #51 | — |
 
 각 PR: 같은 데이터로 찍은 before/after를 `Design/stages/<단계>.jpg`로 남긴다(라이트/다크 둘 다). 한 세션 = 한 화면 묶음.
 
@@ -54,6 +55,7 @@
 - 3c: [stages/3c-capture.jpg](stages/3c-capture.jpg)
 - 3d: [stages/3d-people.jpg](stages/3d-people.jpg)
 - 3e: [stages/3e-notify-empty.jpg](stages/3e-notify-empty.jpg)
+- 전체 after: [audit-2026-08-17-after-light.jpg](audit-2026-08-17-after-light.jpg) · [-dark](audit-2026-08-17-after-dark.jpg)
 
 ## 토큰 요약 (진실은 `Cutin/DesignSystem/`)
 

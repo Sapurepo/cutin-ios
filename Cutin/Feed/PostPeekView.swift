@@ -48,7 +48,7 @@ struct PostPeekView: View {
         .sheet(item: $shareURL) { url in
             ShareSheet(url: url)
         }
-        .onAppear { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        .onAppear { Haptics.medium() }
     }
 
     // MARK: - 카드
