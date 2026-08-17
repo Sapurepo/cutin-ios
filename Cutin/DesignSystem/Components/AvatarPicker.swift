@@ -39,18 +39,18 @@ struct AvatarPicker: View {
         let isBusy = isBusy
         let palette = palette
 
-        VStack(spacing: Spacing.x2) {
-            PhotosPicker(selection: $selection, matching: .images) {
-                PickerLabel(url: url, nickname: nickname, size: size,
-                            isBusy: isBusy, palette: palette)
-            }
-            .buttonStyle(.plain)
-            .disabled(isBusy)
-
+        PhotosPicker(selection: $selection, matching: .images) {
+            PickerLabel(url: url, nickname: nickname, size: size,
+                        isBusy: isBusy, palette: palette)
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy)
+        /* 지우기는 **길게 눌러** 나온다. 0.3.0은 아바타 밑에 "사진 지우기"가 상시 노출돼 프로필의
+         * 머리가 지우기 안내로 시작했다(0.4.0 감사). 지우기는 드문 일이라 숨겨도 되고, 사진 위
+         * 길게 누르기는 iOS가 가르쳐 둔 문법이다. */
+        .contextMenu {
             if allowsRemoval, url != nil, !isBusy {
-                Button("사진 지우기") { Task { await session.removeAvatar() } }
-                    .font(Typography.caption)
-                    .foregroundStyle(palette.textSecondary)
+                Button("사진 지우기", role: .destructive) { Task { await session.removeAvatar() } }
             }
         }
         .onChange(of: selection) { _, item in

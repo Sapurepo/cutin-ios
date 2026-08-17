@@ -86,11 +86,11 @@ struct UserProfileView: View {
             AvatarView(url: profile.avatarUrl, nickname: profile.nickname)
 
             Text(profile.nickname ?? "이름 없음")
-                .font(Typography.headline)
+                .font(Typography.title)
                 .foregroundStyle(palette.textPrimary)
 
             Text("친구 \(profile.friendCount)명")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
 
             if !profile.blocking { followButton(profile) }
@@ -154,7 +154,7 @@ struct UserProfileView: View {
 
     private var blockedNotice: some View {
         Text("차단한 사람이에요. 서로의 컷이 보이지 않아요")
-            .font(Typography.caption)
+            .font(Typography.body)
             .foregroundStyle(palette.textSecondary)
             .padding(.top, Spacing.x8)
     }
@@ -174,7 +174,7 @@ struct UserProfileView: View {
                 /* 볼 수 없는 것과 없는 것을 가르지 않는다 — 서버가 공개 범위로 걸러 주므로
                  * 앱은 어느 쪽인지 모르고, 알려 주면 그 자체가 정보 노출이다. */
                 Text("보여줄 컷이 없어요")
-                    .font(Typography.caption)
+                    .font(Typography.body)
                     .foregroundStyle(palette.textSecondary)
                     .padding(.top, Spacing.x8)
             }

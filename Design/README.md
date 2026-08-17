@@ -40,7 +40,7 @@
 | 3a | 로그인·온보딩·팁 — 첫인상. `StripArt`(합성기 비례의 빈 스트립)로 로그인 히어로와 팁 세 장의 그림을 앱의 실제 부품으로 그린다 | ✅ PR #41 | — |
 | 3b | 피드·카드·상세·댓글 — 카드에 반응·댓글 요약(`ReactionDigest`), 작성자 행 승격, 시각은 사람 말(`Date.casual`). 상세는 댓글을 **바로 아래** 잇고(`CommentsSection` + 바닥 입력칸), 공유·저장·보관은 상단 ⋯ 메뉴로 | ✅ PR #42 | — |
 | 3c | 촬영 5화면 — 설정에 **배치 미리보기**(`TemplateGlyph`, 기본 네 컷) · 편집 3단계 제목에 "n / 3"(`editStepTitle`) · 배치 칩에 글리프 · 보정 타일에 **첫 컷 미리보기** · 마무리 CTA "올리기" · 카메라 셔터 링/권한 안내 | ✅ PR #48 | — |
-| 3d | 프로필·타인 프로필·친구 | PR | 1일 |
+| 3d | 프로필·타인 프로필·친구 — 이름 `title` · 친구 수 `label` · 행 아바타 40 + `subheadline` · 친구 탭 인라인 제목 · 아바타 지우기는 길게 눌러(상시 노출 제거). 떨림·미리보기·고정 해제는 #45 | ✅ PR #49 | — |
 | 3e | 알림·설정·보관·빈 상태 전부 | PR | 1일 |
 | 4 | 폴리시 — 전환·햅틱·런치 스크린·접근성(VoiceOver·대비·Dynamic Type 극단값) · **after 콘택트 시트** | PR + `audit-<날짜>-after` | 1~2일 |
 
@@ -52,6 +52,7 @@
 - 인트로: [stages/intro.jpg](stages/intro.jpg) (0.7 · 1.0 · 1.2초 프레임)
 - 프로필 미리보기: [stages/profile-peek.jpg](stages/profile-peek.jpg)
 - 3c: [stages/3c-capture.jpg](stages/3c-capture.jpg)
+- 3d: [stages/3d-people.jpg](stages/3d-people.jpg)
 
 ## 토큰 요약 (진실은 `Cutin/DesignSystem/`)
 
