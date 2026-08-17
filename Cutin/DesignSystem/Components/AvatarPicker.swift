@@ -39,18 +39,22 @@ struct AvatarPicker: View {
         let isBusy = isBusy
         let palette = palette
 
-        VStack(spacing: Spacing.x2) {
+        /* 지우기는 **길게 눌러** 나온다. 0.3.0은 아바타 밑에 "사진 지우기"가 상시 노출돼 프로필의
+         * 머리가 지우기 안내로 시작했다(0.4.0 감사). 지우기는 드문 일이라 숨겨도 되고, 사진 위
+         * 길게 누르기는 iOS가 가르쳐 둔 문법이다. 컨텍스트 메뉴는 PhotosPicker가 아니라 그것을
+         * 감싼 컨테이너에 건다 — 픽커는 탭을 자기가 잡아 시트를 띄우는 컨트롤이라 길게 누르기가
+         * 픽커에 먹혀 메뉴가 안 뜰 수 있다(리뷰). VoiceOver에는 메뉴 항목이 액션으로 노출된다. */
+        ZStack {
             PhotosPicker(selection: $selection, matching: .images) {
                 PickerLabel(url: url, nickname: nickname, size: size,
                             isBusy: isBusy, palette: palette)
             }
             .buttonStyle(.plain)
             .disabled(isBusy)
-
+        }
+        .contextMenu {
             if allowsRemoval, url != nil, !isBusy {
-                Button("사진 지우기") { Task { await session.removeAvatar() } }
-                    .font(Typography.caption)
-                    .foregroundStyle(palette.textSecondary)
+                Button("사진 지우기", role: .destructive) { Task { await session.removeAvatar() } }
             }
         }
         .onChange(of: selection) { _, item in

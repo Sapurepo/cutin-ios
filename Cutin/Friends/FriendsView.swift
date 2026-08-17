@@ -51,6 +51,7 @@ struct FriendsView: View {
         }
         .background(palette.bg)
         .navigationTitle(AppTab.friends.title)
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "닉네임으로 찾기")
         /* 입력이 멈출 때만 보낸다. `.task(id:)`가 값이 바뀌면 이전 작업을 취소하므로
          * 아래 `Task.sleep`이 디바운스가 된다(온보딩 닉네임 확인과 같은 방식). */
@@ -172,11 +173,12 @@ struct FriendsView: View {
     private func row(_ user: UserSummary) -> some View {
         NavigationLink(value: Route.userProfile(user.id)) {
             HStack(spacing: Spacing.x3) {
-                AvatarView(url: user.avatarUrl, nickname: user.nickname, size: 36)
+                AvatarView(url: user.avatarUrl, nickname: user.nickname, size: 40)
                 Text(user.nickname ?? "이름 없음")
-                    .font(Typography.bodyText)
+                    .font(Typography.subheadline)
                     .foregroundStyle(palette.textPrimary)
             }
+            .padding(.vertical, Spacing.x1)
         }
     }
 
@@ -184,18 +186,19 @@ struct FriendsView: View {
     private func recommendedRow(_ item: RecommendedUsers.Item) -> some View {
         NavigationLink(value: Route.userProfile(item.id)) {
             HStack(spacing: Spacing.x3) {
-                AvatarView(url: item.avatarUrl, nickname: item.nickname, size: 36)
+                AvatarView(url: item.avatarUrl, nickname: item.nickname, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.nickname ?? "이름 없음")
-                        .font(Typography.bodyText)
+                        .font(Typography.subheadline)
                         .foregroundStyle(palette.textPrimary)
                     if item.mutualFriendCount > 0 {
                         Text("함께 아는 친구 \(item.mutualFriendCount)명")
-                            .font(Typography.caption)
+                            .font(Typography.label)
                             .foregroundStyle(palette.textSecondary)
                     }
                 }
             }
+            .padding(.vertical, Spacing.x1)
         }
     }
 }
