@@ -66,6 +66,12 @@ enum ThumbnailHarness {
          * 가르면 전 셀에 핀이 붙는다(2026-08-17 감사 B3). 0은 기본과 같은 그림이라 고정이 아니다. */
         expect(!post(cutIndexes: [0, 1], thumbnail: 0).isPinned,
                "0은 서버가 채우는 기본 — 고정이 아니다")
+        /* 서버가 `pinned`를 주면(cutin-backend#14) 그 값이 답이다 — 대표 컷과 별개. 대표 컷 없이
+         * 고정만 켤 수도, 대표 컷을 골랐지만 고정을 풀 수도 있다. */
+        expect(post(cutIndexes: [0, 1], thumbnail: 0, pinned: true).isPinned,
+               "pinned=true면 대표 컷이 기본이어도 고정")
+        expect(!post(cutIndexes: [0, 1], thumbnail: 1, pinned: false).isPinned,
+               "pinned=false면 대표 컷을 골랐어도 고정이 아니다")
     }
 
     // MARK: - ② pinnedFirst
@@ -101,7 +107,7 @@ enum ThumbnailHarness {
     // MARK: - 표본
 
     private static func post(name: String = "P", cutIndexes: [Int], thumbnail: Int?,
-                             composed: Bool = true) -> Post {
+                             pinned: Bool? = nil, composed: Bool = true) -> Post {
         let template = Template(id: UUID(), code: "grid4", name: "네 컷", cutCount: 4,
                                 aspectRatio: "1:1",
                                 slots: [TemplateSlot(x: 0, y: 0, width: 1, height: 1)])
@@ -110,7 +116,7 @@ enum ThumbnailHarness {
             author: PostAuthor(id: UUID(), nickname: name, avatarUrl: nil),
             template: template, frame: nil,
             status: ServerEnum(.published), visibility: ServerEnum(.friends),
-            caption: name, thumbnailCutIndex: thumbnail,
+            caption: name, thumbnailCutIndex: thumbnail, pinned: pinned,
             cuts: cutIndexes.map { index in
                 PostCut(cutIndex: index, media: media(url: "https://cut/\(index)"))
             },

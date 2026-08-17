@@ -27,8 +27,24 @@ final class AppCoordinator {
     /* 포스트 미리보기(길게 누르기 → 팝업). 탭 트리 **위**에 그려야 탭바·내비게이션 바까지 스크림이
      * 덮이므로 셸이 소유한다 — 프로필 그리드가 요청하고 `RootView`가 그린다. */
     var peekPostId: UUID?
-    /// 프로필 탭의 네비게이션 경로. 미리보기의 "댓글"이 상세를 밀어 넣는 데 쓴다.
+
+    /* 탭 넷의 네비게이션 경로. 화면 밖(미리보기 팝업)에서 상세를 밀어 넣으려면 "지금 보고 있는
+     * 스택"에 손이 닿아야 한다 — NavigationLink는 자기 스택 안에서만 통한다. */
+    var homePath: [Route] = []
+    var friendsPath: [Route] = []
     var profilePath: [Route] = []
+    var archivePath: [Route] = []
+
+    /// 지금 보고 있는 탭의 스택에 밀어 넣는다. 촬영 탭은 스택이 없다 — 홈으로 보낸다.
+    func push(_ route: Route) {
+        switch tab {
+        case .home: homePath.append(route)
+        case .friends: friendsPath.append(route)
+        case .profile: profilePath.append(route)
+        case .archive: archivePath.append(route)
+        case .capture: tab = .home; homePath.append(route)
+        }
+    }
 
     /// 액션 탭(중앙 CTA)은 선택값으로 삼지 않는다 — 탭은 그대로 두고 시트만 연다.
     ///

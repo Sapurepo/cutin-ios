@@ -18,6 +18,7 @@ struct UserProfileView: View {
 
     @Environment(SocialStore.self) private var social
     @Environment(PostStore.self) private var posts
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.palette) private var palette
 
     @State private var isConfirmingBlock = false
@@ -182,10 +183,10 @@ struct UserProfileView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(items, id: \.id) { post in
-                    NavigationLink(value: Route.postDetail(post.id)) {
-                        PostThumbnail(post: post)
-                    }
-                    .buttonStyle(.plain)
+                    // 내 프로필과 같은 셀 — 짧게 상세, 길게 미리보기(고정 해제는 내 것에만 뜬다).
+                    PostGridCell(post: post,
+                                 onTap: { coordinator.push(.postDetail(post.id)) },
+                                 onLongPress: { coordinator.peekPostId = post.id })
                 }
                 if list.nextCursor != nil {
                     ProgressView().task { await posts.loadUser(id: id) }

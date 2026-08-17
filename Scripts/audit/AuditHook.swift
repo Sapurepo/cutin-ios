@@ -33,6 +33,8 @@ enum AuditHook {
     }
 
     static func apply(coordinator: AppCoordinator, flow: CaptureFlow, catalog: TemplateCatalog) async {
+        // 홈 스택은 코디네이터가 들고 있다 — 라우트를 그대로 밀어 넣는다.
+        if !routes.isEmpty { coordinator.homePath = routes }
         switch screen {
         case "friends": coordinator.select(.friends, hasDraft: false)
         case "profile": coordinator.select(.profile, hasDraft: false)
