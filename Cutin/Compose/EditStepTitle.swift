@@ -15,6 +15,9 @@ private struct EditStepTitle: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // 제목은 principal 뷰가 그리지만 navigationTitle도 준다 — 다음 화면의 뒤로 버튼 라벨과
+            // VoiceOver가 이 값을 읽는다.
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
