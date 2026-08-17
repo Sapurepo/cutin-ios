@@ -57,7 +57,7 @@ struct CommentsSection: View {
                     .disabled(list.isLoading)
                     .frame(maxWidth: .infinity)
                 }
-                // 댓글 사이 4pt — 한 덩어리로 읽히되 어디서 갈리는지는 보이게.
+                // 댓글 사이 4pt(+ 행 안 여백 8) — 한 덩어리로 읽히되 어디서 갈리는지는 보이게.
                 LazyVStack(alignment: .leading, spacing: Spacing.x1) {
                     ForEach(list.items, id: \.id) { comment in
                         row(comment)
@@ -78,7 +78,8 @@ struct CommentsSection: View {
     }
 
     /* 한 줄: 아바타 · 이름 + 시각 · 본문. 세로 여백을 넉넉히 둔다 — 댓글은 훑는 게 아니라 읽는
-     * 것이라 줄이 붙어 있으면 누가 어디까지 말했는지 흐려진다. */
+     * 것이라 줄이 붙어 있으면 누가 어디까지 말했는지 흐려진다. 배경 면은 없다 — 카드 위에 카드를
+     * 얹으면 대화가 상자 더미로 보인다. 행은 여백과 아바타로만 갈린다. */
     private func row(_ comment: Comment) -> some View {
         HStack(alignment: .top, spacing: Spacing.x3) {
             NavigationLink(value: Route.userProfile(comment.author.id)) {
@@ -107,9 +108,8 @@ struct CommentsSection: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, Spacing.x3)
-        .padding(.horizontal, Spacing.x3)
-        .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
+        .padding(.vertical, Spacing.x2)
+        .contentShape(.rect)
         /* 내 댓글은 지우고, 남의 댓글은 신고한다. 서버가 남의 댓글 삭제를 막으므로
          * 지우기 버튼을 두면 거짓 약속이다. */
         .contextMenu {
