@@ -14,8 +14,6 @@ extension View {
                 PostDetailView(id: id)
             case .userProfile(let id):
                 UserProfileView(id: id)
-            case .comments(let id):
-                CommentsView(postId: id)
             case .notifications:
                 NotificationsView()
             case .notificationSettings:

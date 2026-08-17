@@ -28,7 +28,6 @@ $S feed feed
 $S notifications notifications
 AUDIT_POST=$MINE $S postDetail-mine postDetail
 AUDIT_POST=$OTHER $S postDetail-other postDetail
-AUDIT_POST=$MINE $S comments comments
 $S friends friends
 AUDIT_USER=$USER $S userProfile userProfile
 $S profile profile
@@ -48,7 +47,7 @@ WAIT=6 $S finish finish
 
 # 콘택트 시트
 cd $OUT
-ORDER=(login onboarding tips-first feed notifications postDetail-mine postDetail-other comments friends userProfile profile archive notificationSettings tips captureSetup camera template filter finish)
+ORDER=(login onboarding tips-first feed notifications postDetail-mine postDetail-other friends userProfile profile archive notificationSettings tips captureSetup camera template filter finish)
 L=(); D=()
 for n in $ORDER; do [ -f $n-light.png ] && L+=("$n=$n-light.png"); [ -f $n-dark.png ] && D+=("$n=$n-dark.png"); done
 swift $HERE/montage.swift $OUT/contact-light.png 260 5 $L

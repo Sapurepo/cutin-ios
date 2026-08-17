@@ -13,8 +13,6 @@ enum Route: Hashable {
     case postDetail(UUID)
     /// 타인 프로필(§9). 내 프로필은 탭이라 여기 오지 않는다.
     case userProfile(UUID)
-    /// 댓글 목록(§7.2). 상세에서 푸시한다 — 시트로 띄우면 키보드와 겹쳐 목록이 반쪽이 된다.
-    case comments(UUID)
     /// 인앱 알림(§10). 탭이 아니라 피드 툴바에서 푸시한다 — 5탭은 명세로 확정돼 있다.
     case notifications
     /// 알림 설정(§3.3 슬롯 · §8.3 설정). 프로필에서 푸시한다.

@@ -92,7 +92,7 @@ struct PostList<Empty: View>: View {
 
     private var content: some View {
         ScrollView {
-            LazyVStack(spacing: Spacing.x6) {
+            LazyVStack(spacing: Spacing.x8) {
                 ForEach(posts, id: \.id) { post in
                     NavigationLink(value: Route.postDetail(post.id)) {
                         PostCard(post: post)

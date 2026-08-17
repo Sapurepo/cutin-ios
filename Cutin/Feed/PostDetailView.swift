@@ -2,9 +2,11 @@
  *
  * 담은 것: §7.1 공유, §7.4 보관, §7.5 삭제, 그리고 사진 앱 저장
  * (`Info.plist`의 `NSPhotoLibraryAddUsageDescription`이 이미 약속한 기능이다).
+ * 넷 다 **상단 더보기(…) 메뉴**에 있다 — 0.3.0은 공유·저장·보관을 큰 원형 버튼 셋으로
+ * 본문에 두어 화면에서 가장 무거운 요소가 부가 기능이었다(0.4.0 감사). 사진과 대화가 본문이다.
  *
- * §7.2 댓글은 목록 화면으로 푸시하고, §7.3 반응은 여기에 줄로 둔다 — 반응은 누르고 끝이지만
- * 댓글은 쓰는 동안 키보드가 화면을 반으로 나눈다.
+ * §7.3 반응은 줄로, §7.2 댓글은 **바로 아래 이어서** 보인다(`CommentsSection`). 입력칸은
+ * 바닥에 붙는다.
  *
  * 포스트를 값으로 받지 않고 id로 되찾는다(규칙 4) — 보관·삭제가 목록도 함께 바꾼다.
  *
@@ -57,19 +59,45 @@ struct PostDetailView: View {
                 author(post)
                 if let caption = post.caption, !caption.isEmpty {
                     Text(caption)
-                        .font(Typography.bodyText)
+                        .font(Typography.body)
                         .foregroundStyle(palette.textPrimary)
+                        .lineSpacing(3)
                 }
                 if let notice { noticeLabel(notice) }
                 reactions(post)
-                commentsLink(post)
-                actions(post)
+                CommentsSection(post: post)
+                    .padding(.top, Spacing.x2)
             }
             .padding(Spacing.x4)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            CommentComposer(postId: post.id) { await store.refresh(id: post.id) }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    Button {
+                        Task { await toggleBookmark(post) }
+                    } label: {
+                        Label(post.bookmarked ? "보관 해제" : "보관",
+                              systemImage: post.bookmarked ? "bookmark.fill" : "bookmark")
+                    }
+                    Button {
+                        Task { await saveToPhotos(post) }
+                    } label: {
+                        Label(isSavingToPhotos ? "저장 중…" : "사진 앱에 저장",
+                              systemImage: "arrow.down.to.line")
+                    }
+                    .disabled(isSavingToPhotos || post.composed == nil)
+                    /* 공유 링크는 **누른 뒤에** 받는다. 화면을 열 때마다 미리 받으면 비공개 포스트에서
+                     * 매번 403이 나고, 정작 쓰지도 않을 왕복을 목록 스크롤마다 만든다. */
+                    Button {
+                        Task { await prepareShare(post) }
+                    } label: {
+                        Label("공유", systemImage: "square.and.arrow.up")
+                    }
+                    Divider()
                     // 남의 포스트는 지울 수 없다 — 서버가 404를 내므로 버튼을 두면 거짓 약속이다.
                     if post.author.id == session.userId {
                         Button("삭제", role: .destructive) { delete(post) }
@@ -84,6 +112,11 @@ struct PostDetailView: View {
         .sheet(isPresented: $isReporting) {
             ReportSheet(targetType: .post, targetId: post.id)
         }
+        /* 링크가 준비되면 시스템 공유 시트를 띄운다. `ShareLink`는 값이 미리 있어야 해서
+         * 왕복이 필요한 지금 구조에는 맞지 않는다. */
+        .sheet(item: $shareURL) { url in
+            ShareSheet(url: url)
+        }
     }
 
     // MARK: - 본문
@@ -94,9 +127,9 @@ struct PostDetailView: View {
             NavigationLink(value: Route.userProfile(post.author.id)) {
                 HStack(spacing: Spacing.x2) {
                     AvatarView(url: post.author.avatarUrl,
-                               nickname: post.author.nickname, size: 28)
+                               nickname: post.author.nickname, size: 30)
                     Text(post.author.nickname ?? "이름 없음")
-                        .font(Typography.bodyText)
+                        .font(Typography.subheadline)
                         .foregroundStyle(palette.textPrimary)
                 }
             }
@@ -104,8 +137,8 @@ struct PostDetailView: View {
             .disabled(post.author.id == session.userId)
             Spacer(minLength: 0)
             if let date = post.displayDate {
-                Text(date, format: .dateTime.year().month().day().hour().minute())
-                    .font(Typography.numeric)
+                Text(date.casual())
+                    .font(Typography.caption)
                     .foregroundStyle(palette.textSecondary)
             }
         }
@@ -149,71 +182,6 @@ struct PostDetailView: View {
             }
             Spacer(minLength: 0)
         }
-    }
-
-    private func commentsLink(_ post: Post) -> some View {
-        NavigationLink(value: Route.comments(post.id)) {
-            HStack(spacing: Spacing.x2) {
-                Image(systemName: "bubble.left")
-                    .font(.system(size: 15, weight: .medium))
-                Text(post.commentCount == 0 ? "댓글 남기기" : "댓글 \(post.commentCount)개")
-                    .font(Typography.bodyText)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(palette.textSecondary)
-            }
-            .foregroundStyle(palette.textPrimary)
-            .padding(Spacing.x3)
-            .background(palette.surface, in: .rect(cornerRadius: Radius.sm))
-            .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm), color: palette.border)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func actions(_ post: Post) -> some View {
-        HStack(spacing: Spacing.x2) {
-            /* 공유 링크는 **누른 뒤에** 받는다. 화면을 열 때마다 미리 받으면 비공개 포스트에서
-             * 매번 403이 나고, 정작 쓰지도 않을 왕복을 목록 스크롤마다 만든다. */
-            Button {
-                Task { await prepareShare(post) }
-            } label: {
-                actionLabel("공유", systemImage: "square.and.arrow.up")
-            }
-
-            Button {
-                Task { await saveToPhotos(post) }
-            } label: {
-                actionLabel(isSavingToPhotos ? "저장 중…" : "사진 앱에 저장",
-                            systemImage: "arrow.down.to.line")
-            }
-            .disabled(isSavingToPhotos || post.composed == nil)
-
-            Button {
-                Task { await toggleBookmark(post) }
-            } label: {
-                actionLabel(post.bookmarked ? "보관 해제" : "보관",
-                            systemImage: post.bookmarked ? "bookmark.fill" : "bookmark")
-            }
-        }
-        .buttonStyle(.glass)
-        .frame(maxWidth: .infinity)
-        /* 링크가 준비되면 시스템 공유 시트를 띄운다. `ShareLink`는 값이 미리 있어야 해서
-         * 왕복이 필요한 지금 구조에는 맞지 않는다. */
-        .sheet(item: $shareURL) { url in
-            ShareSheet(url: url)
-        }
-    }
-
-    private func actionLabel(_ title: String, systemImage: String) -> some View {
-        VStack(spacing: Spacing.x1) {
-            Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .medium))
-            Text(title)
-                .font(Typography.chip)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.x2)
     }
 
     // MARK: - 동작
