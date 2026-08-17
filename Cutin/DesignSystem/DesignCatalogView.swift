@@ -44,7 +44,7 @@ struct DesignCatalogView: View {
     // MARK: - 색
 
     private var colors: some View {
-        section("색 — 크롬은 잉크, 켜진 것만 웜") {
+        section("색 — 크롬도 켜진 것도 잉크, 무게로 가른다") {
             let swatches: [(String, Color, Bool)] = [
                 ("bg", palette.bg, true), ("surface", palette.surface, true),
                 ("sunken", palette.surfaceSunken, true), ("raised", palette.surfaceRaised, true),
@@ -105,7 +105,7 @@ struct DesignCatalogView: View {
     // MARK: - 칩
 
     private var chips: some View {
-        section("칩 — 켜진 것은 웜 옅은 면, 채움 없음") {
+        section("칩 — 켜진 것은 옅은 면 + 잉크 테두리, 채움 없음") {
             VStack(alignment: .leading, spacing: Spacing.x3) {
                 HStack(spacing: Spacing.x2) {
                     ForEach(["한 컷", "두 컷", "네 컷", "여섯 컷"], id: \.self) { name in
@@ -202,7 +202,7 @@ struct DesignCatalogView: View {
                 RemoteImage(url: nil).frame(width: 96, height: 96).clipShape(.rect(cornerRadius: Radius.md))
                     .overlay(alignment: .topTrailing) {
                         Image(systemName: "pin.fill").font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white).padding(4).background(palette.brand, in: .circle).padding(4)
+                            .foregroundStyle(palette.accentOn).padding(4).background(palette.brand, in: .circle).padding(4)
                     }
                 AvatarView(url: nil, nickname: "Ada", size: 56)
                 AvatarView(url: nil, nickname: nil, size: 40)

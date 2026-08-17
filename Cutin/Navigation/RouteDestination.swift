@@ -12,6 +12,8 @@ extension View {
             switch route {
             case .postDetail(let id):
                 PostDetailView(id: id)
+            case .postComments(let id):
+                PostDetailView(id: id, focusesComposer: true)
             case .userProfile(let id):
                 UserProfileView(id: id)
             case .notifications:

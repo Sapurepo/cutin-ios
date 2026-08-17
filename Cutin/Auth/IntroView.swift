@@ -1,4 +1,4 @@
-/* 인트로 — 앱을 켤 때 네 컷이 한 칸씩 찍히고 CUTIN이 올라온다.
+/* 인트로 — 앱을 켤 때 아이콘의 꽃잎 넷이 한 장씩 피고 CUTIN이 올라온다.
  *
  * **기다리는 시간을 새로 만들지 않는다.** 앱 시작 직후 `/users/me` 왕복(`AuthSession.restore`)이
  * 어차피 0.3~0.8초 걸리고, 0.3.0은 그동안 빈 배경이었다. 이 화면은 그 구간을 덮는 덮개다 —
@@ -6,9 +6,11 @@
  * `AuthGate`가 앱 수명 동안 한 번 만들어지고 `restore()`도 한 번이라 백그라운드에서 돌아올 때는
  * 지나가지 않는다.
  *
- * 리듬은 제품에서 왔다 — 연속 촬영 3·2·1처럼 120ms 간격으로 한 칸씩, 칸마다 짧은 플래시.
- * 넷째 칸만 웜 포인트(켜진 것의 색)이고 그 순간 가벼운 햅틱 한 번. 이어서 워드마크가 넓게
- * 벌어진 자간에서 로고 자간으로 조여들며 올라온다.
+ * 그림은 **앱 아이콘 그대로**다(`AppMark` — 아이콘 문서의 꽃잎 좌표·색). 홈 화면에서 누른
+ * 아이콘이 화면 안에서 다시 피어나는 장면이라 다른 로고를 그리면 다른 앱이 된다. 리듬은
+ * 연속 촬영 3·2·1처럼 120ms 간격으로 한 장씩(위 → 오른쪽 → 아래 → 왼쪽, 아이콘 레이어 순),
+ * 넷째 장에 가벼운 햅틱 한 번. 이어서 워드마크가 넓게 벌어진 자간에서 로고 자간으로 조여들며
+ * 올라온다.
  *
  * 움직임 줄이기가 켜져 있으면 완성된 그림을 0.4초 보여주고 끝난다. */
 
@@ -23,14 +25,14 @@ struct IntroView: View {
 
     @State private var started = false
 
-    /// 칸 간격(초). 넷째 칸이 0.36초에 찍히고 워드마크는 0.42초에 올라오기 시작한다.
+    /// 장 간격(초). 넷째 장이 0.36초에 피고 워드마크는 0.42초에 올라오기 시작한다.
     private static let beat: Double = 0.12
-    private static let cutSize: CGFloat = 44
+    private static let markSize: CGFloat = 156
     private static let total: Double = 0.95
 
     var body: some View {
-        VStack(spacing: Spacing.x6) {
-            grid
+        VStack(spacing: Spacing.x5) {
+            mark
             wordmark
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -44,57 +46,45 @@ struct IntroView: View {
         }
     }
 
-    // MARK: - 네 컷
+    // MARK: - 꽃잎 넷
 
-    // Lazy 그리드는 스크롤 없는 자리에서 셀 하나만 놓았다 — 넷은 손으로 놓는다.
-    private var grid: some View {
-        VStack(spacing: Spacing.x2) {
-            HStack(spacing: Spacing.x2) { cut(0); cut(1) }
-            HStack(spacing: Spacing.x2) { cut(2); cut(3) }
+    private var mark: some View {
+        ZStack {
+            ForEach(AppMark.petals) { petal in
+                self.petal(petal)
+            }
         }
+        .frame(width: Self.markSize, height: Self.markSize)
     }
 
-    /* 칸 하나 — 살짝 작았다가 자리를 잡고(0.86→1), 나타나는 순간 흰 플래시가 스치고 사라진다.
-     * `keyframeAnimator`로 칸마다 시작 시각을 늦춘다 — 앞의 `hold` 구간이 그 지연이다. */
+    /* 꽃잎 하나 — 중심에서 살짝 작게(0.7) 시작해 자리를 잡으며 나타난다. `keyframeAnimator`로
+     * 장마다 시작 시각을 늦춘다 — 앞의 `hold` 구간이 그 지연이다. */
     @ViewBuilder
-    private func cut(_ index: Int) -> some View {
-        let isLast = index == 3
-        let square = RoundedRectangle(cornerRadius: Radius.sm)
-            .fill(isLast ? palette.brand : palette.textPrimary)
-            .frame(width: Self.cutSize, height: Self.cutSize)
+    private func petal(_ petal: AppMark.Petal) -> some View {
+        let leaf = AppMarkPetal(petal: petal, size: Self.markSize)
         if reduceMotion {
-            // 애니메이터를 아예 걸지 않는다 — 걸면 첫 프레임에 트랙 시작값(0.86 · 투명)이 스친다.
-            square
+            // 애니메이터를 아예 걸지 않는다 — 걸면 첫 프레임에 트랙 시작값(0.7 · 투명)이 스친다.
+            leaf
         } else {
-            let delay = Self.beat * Double(index) + 0.05
-            square.keyframeAnimator(initialValue: CutState(scale: 0.86, opacity: 0, flash: 0),
-                                    trigger: started) { view, state in
+            let delay = Self.beat * Double(petal.id) + 0.05
+            leaf.keyframeAnimator(initialValue: PetalState(scale: 0.7, opacity: 0),
+                                  trigger: started) { view, state in
                 view
                     .scaleEffect(state.scale)
                     .opacity(state.opacity)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: Radius.sm)
-                            .fill(.white)
-                            .opacity(state.flash)
-                    }
             } keyframes: { _ in
                 KeyframeTrack(\.opacity) {
                     LinearKeyframe(0, duration: delay)
-                    LinearKeyframe(1, duration: 0.06)
+                    LinearKeyframe(1, duration: 0.14)
                 }
                 KeyframeTrack(\.scale) {
-                    LinearKeyframe(0.86, duration: delay)
-                    SpringKeyframe(1.0, duration: 0.32, spring: .bouncy(duration: 0.32, extraBounce: 0.05))
-                }
-                KeyframeTrack(\.flash) {
-                    LinearKeyframe(0, duration: delay)
-                    LinearKeyframe(0.85, duration: 0.03)
-                    LinearKeyframe(0, duration: 0.18)
+                    LinearKeyframe(0.7, duration: delay)
+                    SpringKeyframe(1.0, duration: 0.36, spring: .bouncy(duration: 0.36, extraBounce: 0.04))
                 }
             }
             .onChange(of: started) { _, _ in
-                // 넷째 컷의 셔터 — 그 시각에 맞춰 한 번.
-                guard isLast else { return }
+                // 넷째 장 — 그 시각에 맞춰 가벼운 햅틱 한 번.
+                guard petal.id == AppMark.petals.count - 1 else { return }
                 Task {
                     try? await Task.sleep(for: .seconds(delay))
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -103,10 +93,9 @@ struct IntroView: View {
         }
     }
 
-    private struct CutState {
+    private struct PetalState {
         var scale: CGFloat
         var opacity: Double
-        var flash: Double
     }
 
     // MARK: - 워드마크

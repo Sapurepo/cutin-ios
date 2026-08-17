@@ -83,8 +83,9 @@ struct PostPeekView: View {
         }
         .padding(Spacing.x3)
         .raised(cornerRadius: Radius.lg)
-        // 카드 위를 눌러도 닫히지 않는다 — 스크림의 탭이 카드까지 번지지 않게 막는다.
-        .onTapGesture {}
+        // 카드를 누르면 상세로 — 미리보기는 "더 보고 싶다"의 앞 단계다.
+        .contentShape(.rect)
+        .onTapGesture { openDetail(post) }
     }
 
     // MARK: - 글래스 막대
@@ -96,7 +97,7 @@ struct PostPeekView: View {
         let isMine = post.author.id == session.userId
         return GlassEffectContainer(spacing: Spacing.x2) {
             HStack(spacing: Spacing.x2) {
-                action("댓글", systemImage: "bubble.left") { openDetail(post) }
+                action("댓글", systemImage: "bubble.left") { openComments(post) }
                 action("공유", systemImage: "square.and.arrow.up") { Task { await share(post) } }
                 action(post.bookmarked ? "보관 해제" : "보관",
                        systemImage: post.bookmarked ? "bookmark.fill" : "bookmark") {
@@ -129,10 +130,16 @@ struct PostPeekView: View {
 
     // MARK: - 동작
 
-    /// 댓글 — 상세를 프로필 스택에 밀어 넣는다(상세가 댓글을 바로 보여준다). 팝업은 닫는다.
+    /// 카드 → 상세. 팝업은 닫는다.
     private func openDetail(_ post: Post) {
         onClose()
         coordinator.profilePath.append(.postDetail(post.id))
+    }
+
+    /// 댓글 → 상세를 **입력칸에 포커스한 채로**(`Route.postComments`). 댓글을 남기러 온 것이다.
+    private func openComments(_ post: Post) {
+        onClose()
+        coordinator.profilePath.append(.postComments(post.id))
     }
 
     private func share(_ post: Post) async {

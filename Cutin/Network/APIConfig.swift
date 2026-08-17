@@ -4,7 +4,7 @@
  * 그 값이 소스에 있으면 구성마다 코드가 갈린다. 0.1.0에서 xcconfig를 분리해 둔 이유가 이것이다.
  *
  *     Config/Shared.xcconfig   CUTIN_SLASH = /
- *     Config/Debug.xcconfig    CUTIN_API_BASE_URL = http:$(CUTIN_SLASH)$(CUTIN_SLASH)localhost:3000
+ *     Config/Debug.xcconfig    CUTIN_API_BASE_URL = http:$(CUTIN_SLASH)$(CUTIN_SLASH)localhost:8000
  *     Config/Info.plist        CutinAPIBaseURL = $(CUTIN_API_BASE_URL)
  *
  * **슬래시를 변수로 넣는 것은 우회가 아니라 필수다.** xcconfig에서 `//`는 주석 시작이고
