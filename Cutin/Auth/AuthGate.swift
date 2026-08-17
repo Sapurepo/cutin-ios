@@ -12,6 +12,10 @@ struct AuthGate: View {
     @Environment(AuthSession.self) private var session
     @Environment(\.colorScheme) private var colorScheme
 
+    /* 이 기기에서 팁(§3.5)을 봤는지. 계정이 아니라 **기기** 상태다 — 서버에 대응 필드가 없고,
+     * 도움말이 재설치 후 한 번 더 뜨는 것은 사고가 아니다. 재열람은 프로필의 도움말 메뉴다. */
+    @AppStorage("tips.seen") private var hasSeenTips = false
+
     var body: some View {
         content
             /* 앱을 켤 때 한 번. `.task`는 뷰가 사라지면 취소되는데 이 뷰는 앱 수명 동안
@@ -34,6 +38,11 @@ struct AuthGate: View {
          * 서버도 같은 판단이다 — `onboardingCompleted`를 프로필에 실어 준다. */
         case .signedIn(let profile) where !profile.onboardingCompleted:
             OnboardingView(saved: profile.nickname)
+                .environment(\.palette, Palette.of(colorScheme))
+        /* 온보딩을 마친 직후 팁 한 번(§3.5). 셸보다 먼저 가르는 이유는 온보딩과 같다 —
+         * 셸 위에 시트로 얹으면 뒤에서 피드가 이미 돌기 시작한다. */
+        case .signedIn where !hasSeenTips:
+            TipsView(onStart: { hasSeenTips = true })
                 .environment(\.palette, Palette.of(colorScheme))
         case .signedIn:
             RootView()

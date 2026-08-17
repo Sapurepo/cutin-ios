@@ -154,7 +154,8 @@ struct UserProfileView: View {
     @ViewBuilder
     private var grid: some View {
         let list = posts.userList(id: id)
-        let items = list.ids.compactMap(posts.post(id:))
+        // 내 프로필과 같은 고정 규칙 — 대표 컷을 지정한 포스트가 맨 앞이다(§6.3).
+        let items = Post.pinnedFirst(list.ids.compactMap(posts.post(id:)))
 
         if items.isEmpty {
             if list.isLoading || !list.hasLoaded {

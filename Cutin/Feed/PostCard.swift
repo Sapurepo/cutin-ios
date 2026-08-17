@@ -72,8 +72,11 @@ struct PostImage: View {
 
 /* 그리드 셀 — 내 프로필과 타인 프로필 두 그리드가 쓴다(호출부 2곳 규칙).
  *
- * 카드와 달리 **정사각으로 잘라 넣는다.** 템플릿 비율이 제각각이라 셀 높이가 따라가면
- * 3열 격자가 격자로 보이지 않는다. */
+ * 카드와 달리 **정사각으로 잘라 넣고**, 합성본이 아니라 **대표 컷**을 보여준다(§6.3 ·
+ * 0.3.0 제품 결정). 합성본은 세로 스트립이면 정사각 크롭에서 가운데 조각만 남지만,
+ * 컷 한 장은 사진이라 크롭이 자연스럽다. 미지정이면 서버 기본과 같은 첫 컷이다.
+ *
+ * 직접 지정한 포스트에는 핀 배지를 단다 — 그리드 맨 앞 고정과 함께 §6.3의 소비처다. */
 struct PostThumbnail: View {
     let post: Post
 
@@ -82,7 +85,7 @@ struct PostThumbnail: View {
     var body: some View {
         ZStack {
             Rectangle().fill(palette.surfaceSunken)
-            if let composed = post.composed, let url = URL(string: composed.url) {
+            if let url = post.gridImageURL {
                 AsyncImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
@@ -92,29 +95,50 @@ struct PostThumbnail: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .clipped()
+        .overlay(alignment: .topTrailing) {
+            if post.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(palette.accentOn)
+                    .padding(4)
+                    .background(palette.accent, in: .circle)
+                    .padding(4)
+            }
+        }
     }
 }
 
 extension Post {
-    /* 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
+    /// 화면에 쓸 시각. 발행 시각이 있으면 그것, 없으면 만든 시각이다.
+    /// 파싱은 `String.isoDate`가 한다 — 알림 목록도 같은 형식을 읽는다.
+    var displayDate: Date? { (publishedAt ?? createdAt).isoDate }
+
+    /* 대표 컷을 **직접 지정**했는지(§6.3). 미지정(첫 컷 기본)과 구분한다 — 지정한 것만
+     * 프로필 그리드 맨 앞에 고정된다. 여기서 nil 검사만 하는 이유: 어느 컷인지는 아래
+     * `gridImageURL`이 해석하고, 고정 여부는 지정 사실 자체다. */
+    var isPinned: Bool { thumbnailCutIndex != nil }
+
+    /* 그리드 셀에 그릴 이미지 — 대표 컷(미지정이면 첫 컷, 서버 기본과 같다).
      *
-     * 서버가 ISO 8601 문자열로 준다 — 계약 타입이 `Date`로 디코드하지 않는 이유는
-     * `Contracts.swift` 머리말에 적혀 있다(형식이 하나라도 어긋나면 페이지가 통째로 사라진다).
-     * 파싱 실패는 nil이고, 화면은 날짜를 그리지 않는다. */
-    var displayDate: Date? {
-        let text = publishedAt ?? createdAt
-        return Post.isoParser.date(from: text) ?? Post.isoParserNoFraction.date(from: text)
+     * `cutIndex`로 찾고 배열 위치를 믿지 않는다 — 계약이 순서를 약속하지 않는다.
+     * 지정 인덱스에 컷이 없으면(계약 위반) 첫 컷으로, 컷이 하나도 없으면 합성본으로
+     * 내려간다 — 셀 하나가 빈 것보다 낫다. */
+    var gridImageURL: URL? {
+        let wanted = thumbnailCutIndex ?? 0
+        let cut = cuts.first { $0.cutIndex == wanted }
+            ?? cuts.min { $0.cutIndex < $1.cutIndex }
+        guard let raw = cut?.media.url ?? composed?.url else { return nil }
+        return URL(string: raw)
     }
 
-    /* `ISO8601DateFormatter`는 `Sendable`이 아니라 Swift 6에서 전역 상수로 둘 수 없다.
-     * 파서는 만든 뒤 설정을 바꾸지 않고 파싱만 하므로 실제 공유 가변 상태가 없어
-     * `nonisolated(unsafe)`로 표시한다 — 호출마다 새로 만들면 목록 스크롤에서 셀마다
-     * 포매터를 짓게 된다(`Filters.swift`의 `CIContext`와 같은 판단이다). */
-    nonisolated(unsafe) private static let isoParser: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    nonisolated(unsafe) private static let isoParserNoFraction = ISO8601DateFormatter()
+    /* 고정을 앞으로 — 프로필 그리드가 쓴다(내 프로필·타인 프로필 두 곳).
+     *
+     * `sorted`가 아니라 filter 둘을 잇는다. Swift의 `sorted`는 안정성을 보장하지 않아
+     * 같은 그룹 안의 서버 순서(발행 시각)가 뒤섞일 수 있다.
+     *
+     * **받아 온 페이지 안에서만 참이다** — 아직 안 받은 옛 포스트의 고정은 스크롤해야
+     * 나타난다. 서버 정렬 지원이 생기면 이 함수는 사라진다(0.3.0 범위 문서 참고). */
+    static func pinnedFirst(_ posts: [Post]) -> [Post] {
+        posts.filter(\.isPinned) + posts.filter { !$0.isPinned }
+    }
 }

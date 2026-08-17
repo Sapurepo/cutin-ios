@@ -10,13 +10,15 @@
  * 그것을 세면 스크롤할수록 "포스트 수"가 늘어난다. 서버에 합계 API가 없으므로 세지 않는다 —
  * RN판의 하드코딩 통계를 이식하지 않은 것과 같은 이유다(거짓 수치는 없느니만 못하다).
  *
- * 설정 진입(§8.3)은 두지 않는다 — 알림·약관은 아직 열 화면이 없다. 로그아웃만 둔다. */
+ * 설정(§8.3)은 메뉴 하나로 둔다 — 알림 설정과 로그아웃뿐이라 화면을 따로 만들 만큼이 아니다.
+ * 약관·탈퇴는 아직 열 화면이 없다. */
 
 import SwiftUI
 
 struct ProfileView: View {
     @Environment(PostStore.self) private var store
     @Environment(AuthSession.self) private var session
+    @Environment(PushRegistrar.self) private var push
     @Environment(\.palette) private var palette
 
     @State private var isEditingNickname = false
@@ -34,7 +36,8 @@ struct ProfileView: View {
         session.userId.map(store.userList(id:)) ?? PostStore.List()
     }
 
-    private var posts: [Post] { list.ids.compactMap(store.post(id:)) }
+    /// 직접 지정한 대표 컷이 있는 포스트를 맨 앞에 고정한다(§6.3 · 0.3.0 제품 결정).
+    private var posts: [Post] { Post.pinnedFirst(list.ids.compactMap(store.post(id:))) }
 
     var body: some View {
         ScrollView {
@@ -50,8 +53,14 @@ struct ProfileView: View {
         .routeDestinations()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("로그아웃") { Task { await session.signOut() } }
-                    .font(Typography.chip)
+                Menu {
+                    NavigationLink("알림 설정", value: Route.notificationSettings)
+                    // §3.5 "도움말에서 재열람" — 온보딩 직후 한 번 본 팁을 다시 여는 자리다.
+                    NavigationLink("도움말", value: Route.tips)
+                    Button("로그아웃") { Task { await signOut() } }
+                } label: {
+                    Image(systemName: "gearshape")
+                }
             }
         }
         .alert("닉네임", isPresented: $isEditingNickname) {
@@ -65,6 +74,13 @@ struct ProfileView: View {
             Text("프로필에 보여줄 이름을 정해주세요")
         }
         .task { await reload(refresh: false) }
+    }
+
+    /* 로그아웃 전에 푸시 토큰을 지운다. 한 기기를 두 사람이 쓰면 앞사람의 알림이 뒷사람에게
+     * 가고, 서버는 토큰으로 지우므로 세션이 끝나기 전에 불러야 한다. */
+    private func signOut() async {
+        await push.revoke()
+        await session.signOut()
     }
 
     private func reload(refresh: Bool) async {

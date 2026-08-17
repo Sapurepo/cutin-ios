@@ -16,6 +16,12 @@ extension View {
                 UserProfileView(id: id)
             case .comments(let id):
                 CommentsView(postId: id)
+            case .notifications:
+                NotificationsView()
+            case .notificationSettings:
+                NotificationSettingsView()
+            case .tips:
+                TipsView(onStart: nil)
             }
         }
     }
