@@ -101,7 +101,7 @@ struct NotificationsView: View {
 
             // 안 읽음 표시. 배지 대신 점 하나 — 개수가 아니라 여부만 말하면 되는 자리다.
             if item.readAt == nil {
-                Circle().fill(palette.accent).frame(width: 8, height: 8)
+                Circle().fill(palette.brand).frame(width: 8, height: 8)
             }
         }
     }

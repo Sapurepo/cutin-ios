@@ -111,15 +111,18 @@ struct UserProfileView: View {
      * (2026-08-17 감사 B1). 채움 여부가 곧 "누르면 관계가 생긴다/끊긴다"를 가른다. */
     @ViewBuilder
     private func followButton(_ profile: PublicProfile) -> some View {
-        let button = Button {
-            Task { await toggleFollow() }
-        } label: {
-            Text(label(for: profile)).primaryGlassLabel()
-        }
         if profile.following {
-            button.buttonStyle(.glass).padding(.horizontal, Spacing.x8)
+            Button { Task { await toggleFollow() } } label: {
+                Text(label(for: profile)).glassLabel()
+            }
+            .buttonStyle(.glass)
+            .padding(.horizontal, Spacing.x8)
         } else {
-            button.primaryGlassButton(tint: palette.accent).padding(.horizontal, Spacing.x8)
+            Button { Task { await toggleFollow() } } label: {
+                Text(label(for: profile)).primaryGlassLabel()
+            }
+            .primaryGlassButton(tint: palette.accent)
+            .padding(.horizontal, Spacing.x8)
         }
     }
 

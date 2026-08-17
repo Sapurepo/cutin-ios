@@ -168,7 +168,7 @@ struct CaptureView: View {
                 .multilineTextAlignment(.center)
 
             Button("다시 시도") { camera.start() }
-                .primaryGlassButton(tint: .white)
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
         }
         .padding(Spacing.x6)
         .tint(.white)
@@ -190,7 +190,7 @@ struct CaptureView: View {
                 .buttonStyle(.glass)
             } else {
                 Button("카메라 권한 허용") { camera.start() }
-                    .primaryGlassButton(tint: .white)
+                    .primaryGlassButton(tint: .white, label: Palette.light.accent)
             }
         }
         .padding(Spacing.x6)

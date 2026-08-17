@@ -22,6 +22,10 @@ extension View {
                 NotificationSettingsView()
             case .tips:
                 TipsView(onStart: nil)
+            #if DEBUG
+            case .designCatalog:
+                DesignCatalogView()
+            #endif
             }
         }
     }

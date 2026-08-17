@@ -14,9 +14,12 @@ mkdir -p $OUT
 for scheme in ${(s:,:)${MODE/both/light,dark}}; do
   xcrun simctl terminate $DEV $APP 2>/dev/null || true
   xcrun simctl ui $DEV appearance $scheme
-  SIMCTL_CHILD_AUDIT_TOKEN=$TOKEN SIMCTL_CHILD_AUDIT_SCREEN=$SCREEN \
-  SIMCTL_CHILD_AUDIT_POST=${AUDIT_POST:-} SIMCTL_CHILD_AUDIT_USER=${AUDIT_USER:-} \
-  SIMCTL_CHILD_AUDIT_TEMPLATE=${AUDIT_TEMPLATE:-} SIMCTL_CHILD_AUDIT_FRAME=${AUDIT_FRAME:-} \
+  # 값이 있는 것만 넘긴다 — 빈 문자열은 훅이 미설정으로 보지만, 넘기지 않는 편이 분명하다.
+  EXTRA=()
+  for v in AUDIT_POST AUDIT_USER AUDIT_TEMPLATE AUDIT_FRAME AUDIT_CAPTION AUDIT_SECTION; do
+    [ -n "${(P)v}" ] && EXTRA+=("SIMCTL_CHILD_$v=${(P)v}")
+  done
+  env SIMCTL_CHILD_AUDIT_TOKEN=$TOKEN SIMCTL_CHILD_AUDIT_SCREEN=$SCREEN $EXTRA \
     xcrun simctl launch $DEV $APP >/dev/null
   sleep $WAIT
   xcrun simctl io $DEV screenshot $OUT/$NAME-$scheme.png >/dev/null 2>&1

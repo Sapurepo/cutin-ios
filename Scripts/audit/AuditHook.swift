@@ -1,6 +1,6 @@
 /* AUDIT-HOOK (커밋 금지) — UI 감사용. 환경변수로 화면을 바로 연다.
  *
- *   AUDIT_SCREEN = feed | notifications | postDetail | comments | userProfile | tips
+ *   AUDIT_SCREEN = feed | notifications | postDetail | comments | userProfile | tips | catalog
  *                | notificationSettings | friends | profile | archive
  *                | captureSetup | camera | template | filter | finish
  *   AUDIT_POST / AUDIT_USER = UUID
@@ -12,7 +12,10 @@ import SwiftUI
 
 @MainActor
 enum AuditHook {
-    private static var env: [String: String] { ProcessInfo.processInfo.environment }
+    /// 빈 값은 미설정으로 본다 — 셸이 `VAR=${X:-}`로 넘기면 빈 문자열이 들어온다.
+    private static var env: [String: String] {
+        ProcessInfo.processInfo.environment.filter { !$0.value.isEmpty }
+    }
     static var screen: String? { env["AUDIT_SCREEN"] }
 
     static var routes: [Route] {
@@ -25,6 +28,7 @@ enum AuditHook {
         case "userProfile": return [.userProfile(user)]
         case "notificationSettings": return [.notificationSettings]
         case "tips": return [.tips]
+        case "catalog": return [.designCatalog]
         default: return []
         }
     }
@@ -49,7 +53,7 @@ enum AuditHook {
             let frame = catalog.frames.first { $0.code == (env["AUDIT_FRAME"] ?? "white") }
             let drafts = DraftStore()
             try? drafts.save(DraftStore.Draft(
-                createdAt: Date().addingTimeInterval(-3600), mode: .single,
+                createdAt: Date().addingTimeInterval(-20 * 3600), mode: .single, // 컷 파일보다 앞서야 한다(cp는 생성 시각을 보존)
                 cutCount: template?.cutCount ?? 4, template: template, frame: frame,
                 filterID: .original, caption: env["AUDIT_CAPTION"] ?? ""))
             flow.refreshDraft()

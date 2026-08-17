@@ -57,6 +57,9 @@ struct ProfileView: View {
                     NavigationLink("알림 설정", value: Route.notificationSettings)
                     // §3.5 "도움말에서 재열람" — 온보딩 직후 한 번 본 팁을 다시 여는 자리다.
                     NavigationLink("도움말", value: Route.tips)
+                    #if DEBUG
+                    NavigationLink("디자인 카탈로그", value: Route.designCatalog)
+                    #endif
                     Button("로그아웃") { Task { await signOut() } }
                 } label: {
                     Image(systemName: "gearshape")

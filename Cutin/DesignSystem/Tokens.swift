@@ -1,5 +1,10 @@
-/* CUTIN 디자인 토큰 — cutin-frontend `packages/tokens`에서 1:1 이식.
- * 모노크롬(잉크/오프화이트) tone-on-tone. 위계는 FILL/OUTLINE/WEIGHT/SIZE로 만들고 hue로 만들지 않는다.
+/* CUTIN 디자인 토큰 — cutin-frontend `packages/tokens`에서 이식한 모노크롬 골격 위에
+ * 0.4.0이 **웜 포인트 한 색**을 얹었다(`Design/README.md` 결정 기록 2026-08-17).
+ *
+ * 규칙: 크롬(배경·표면·글·CTA·탭바)은 잉크/오프화이트 tone-on-tone 그대로. 위계는 FILL/OUTLINE/
+ * WEIGHT/SIZE로 만든다. **웜 포인트(`brand`)는 "지금 켜져 있는 것"에만 쓴다** — 고른 칩,
+ * 내 반응, 미읽음 점, 핀 배지. CTA에 쓰지 않는다: 켜진 상태와 누를 것이 같은 색이면
+ * 한 화면에 검정 덩어리가 서넛 생기던 0.3.0의 문제(감사 G1)가 색만 바뀐 채 되돌아온다.
  * 순수 #000/#FFF는 눈부심·OLED 잔상 방지를 위해 의도적으로 피한다. */
 
 import SwiftUI
@@ -18,6 +23,22 @@ struct Palette {
     let accentOn: Color
     let danger: Color
 
+    // MARK: 0.4.0 — 웜 포인트 · 표면 위계
+
+    /// 웜 포인트(코랄, 살짝 주황 쪽). 채움·점·배지처럼 **면적이 작은 곳**에 쓴다.
+    /// `danger`(빨강)와 구분되도록 색상환에서 반 단 떨어뜨렸다 — 켜짐과 위험이 같은 색이면 안 된다.
+    let brand: Color
+    /// 웜 포인트로 쓰는 **글자·아이콘** — 밝은 면 위에서 대비를 지키려고 채움보다 진하다
+    /// (라이트 약 4.6:1 on `brandSoft`).
+    let brandInk: Color
+    /// 켜진 칩·내 반응의 배경. 채움이 아니라 옅은 면 — 검정 채움 칩이 사라지는 자리다.
+    let brandSoft: Color
+    /// 카드처럼 **떠 있는** 표면. 라이트는 surface와 같고 그림자로 뜨고, 다크는 한 단 밝다 —
+    /// 다크에서 카드가 배경에 붙던 것(감사 G8)을 면 값으로 가른다.
+    let surfaceRaised: Color
+    /// 시트·모달 뒤 스크림, 이미지 위 그라데이션의 시작색.
+    let scrim: Color
+
     static let light = Palette(
         bg: Color(hex: 0xFAFAF8),
         surface: Color(hex: 0xFFFFFF),
@@ -28,7 +49,12 @@ struct Palette {
         textSecondary: Color(hex: 0x9A9A95),
         accent: Color(hex: 0x0A0A0B),
         accentOn: Color(hex: 0xFFFFFF),
-        danger: Color(hex: 0xFF3B30)
+        danger: Color(hex: 0xFF3B30),
+        brand: Color(hex: 0xEE6A3C),
+        brandInk: Color(hex: 0xC24E22),
+        brandSoft: Color(hex: 0xFCE9DF),
+        surfaceRaised: Color(hex: 0xFFFFFF),
+        scrim: Color(hex: 0x0A0A0B, alpha: 0.45)
     )
 
     static let dark = Palette(
@@ -41,7 +67,12 @@ struct Palette {
         textSecondary: Color(hex: 0x7A7A7E),
         accent: Color(hex: 0xF5F5F4),
         accentOn: Color(hex: 0x0A0A0B),
-        danger: Color(hex: 0xFF453A)
+        danger: Color(hex: 0xFF453A),
+        brand: Color(hex: 0xFF8A5B),
+        brandInk: Color(hex: 0xFFA07A),
+        brandSoft: Color(hex: 0x3D251C),
+        surfaceRaised: Color(hex: 0x1B1B1E),
+        scrim: Color(hex: 0x000000, alpha: 0.6)
     )
 
     static func of(_ scheme: ColorScheme) -> Palette {
@@ -79,6 +110,50 @@ enum Layout {
 
 enum Duration {
     static let fast: TimeInterval = 0.12
+    /// 이미지 페이드인처럼 "도착했다"를 알리는 전환
+    static let medium: TimeInterval = 0.22
+}
+
+/* 움직임 — 셋뿐이다. 화면마다 곡선을 새로 고르면 앱이 여러 사람이 만든 것처럼 움직인다.
+ *   quick     칩·토글처럼 손끝에서 즉시 반응하는 것
+ *   standard  카드 등장·리스트 삽입처럼 화면 안에서 자리를 잡는 것
+ *   emphasized 시트·커버처럼 화면이 통째로 바뀌는 것 */
+enum Motion {
+    static let quick: Animation = .easeOut(duration: Duration.fast)
+    static let standard: Animation = .spring(response: 0.34, dampingFraction: 0.86)
+    static let emphasized: Animation = .spring(response: 0.48, dampingFraction: 0.82)
+}
+
+// MARK: - 떠 있는 표면
+
+/* 카드가 배경에서 뜨게 한다. 라이트는 **그림자**(면 색이 배경과 거의 같아 그림자만이 경계다),
+ * 다크는 그림자가 안 보이므로 **한 단 밝은 면 + 헤어라인**으로 뜬다. 흰 프레임 포스트가 배경과
+ * 붙던 것(감사·피드)을 이 하나로 가른다 — 카드마다 그림자 값을 고르지 않는다. */
+struct RaisedSurface: ViewModifier {
+    var cornerRadius: CGFloat = Radius.lg
+
+    @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let isDark = scheme == .dark
+        content
+            .background(palette.surfaceRaised, in: .rect(cornerRadius: cornerRadius))
+            .overlay {
+                if isDark {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(palette.borderStrong.opacity(0.6), lineWidth: 1)
+                }
+            }
+            .shadow(color: .black.opacity(isDark ? 0 : 0.07), radius: 16, y: 6)
+            .shadow(color: .black.opacity(isDark ? 0 : 0.04), radius: 2, y: 1)
+    }
+}
+
+extension View {
+    func raised(cornerRadius: CGFloat = Radius.lg) -> some View {
+        modifier(RaisedSurface(cornerRadius: cornerRadius))
+    }
 }
 
 // MARK: - Hex helper

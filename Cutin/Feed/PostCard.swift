@@ -1,6 +1,6 @@
 /* 포스트 카드 — 피드(§4.1)·보관(§7.4) 두 목록이 같은 모양을 쓴다.
  *
- * 0.1.0은 로컬 JPEG를 직접 디코드했다. 지금은 서버가 준 URL이라 `AsyncImage`가 받는다 —
+ * 0.1.0은 로컬 JPEG를 직접 디코드했다. 지금은 서버가 준 URL이라 `RemoteImage`가 받는다 —
  * `/media/content/…`는 인증을 요구하지 않고 URLSession 공유 캐시가 그대로 듣는다. */
 
 import SwiftUI
@@ -53,20 +53,12 @@ struct PostImage: View {
     }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Radius.md)
-                .fill(palette.surfaceSunken)
-
-            if let composed = post.composed, let url = URL(string: composed.url) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFit()
-                } placeholder: {
-                    ProgressView().tint(palette.textSecondary)
-                }
-            }
-        }
-        .aspectRatio(ratio, contentMode: .fit)
-        .clipShape(.rect(cornerRadius: Radius.md))
+        RemoteImage(url: post.composed.flatMap { URL(string: $0.url) }, contentMode: .fit)
+            .aspectRatio(ratio, contentMode: .fit)
+            .clipShape(.rect(cornerRadius: Radius.md))
+            /* 합성본이 곧 카드다 — 배경에서 뜨게 한다. 흰 프레임(가장 흔하다)이 오프화이트 배경과
+             * 붙어 어디까지가 사진인지 안 보이던 것(감사·피드)을 그림자/헤어라인이 가른다. */
+            .raised(cornerRadius: Radius.md)
     }
 }
 
@@ -89,23 +81,16 @@ struct PostThumbnail: View {
         Rectangle()
             .fill(palette.surfaceSunken)
             .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if let url = post.gridImageURL {
-                    AsyncImage(url: url) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Color.clear
-                    }
-                }
-            }
+            .overlay { RemoteImage(url: post.gridImageURL) }
             .clipped()
             .overlay(alignment: .topTrailing) {
+            // 배지는 웜 포인트 — "지금 켜져 있는 것"의 색이다(토큰 머리말).
             if post.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(palette.accentOn)
+                    .foregroundStyle(.white)
                     .padding(4)
-                    .background(palette.accent, in: .circle)
+                    .background(palette.brand, in: .circle)
                     .padding(4)
             }
         }

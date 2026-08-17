@@ -21,4 +21,8 @@ enum Route: Hashable {
     case notificationSettings
     /// 서비스 팁 재열람(§3.5 "도움말에서 재열람"). 프로필 설정 메뉴에서 푸시한다.
     case tips
+    #if DEBUG
+    /// 디자인 카탈로그 — Debug 빌드의 프로필 메뉴에서만 연다(`DesignCatalogView`).
+    case designCatalog
+    #endif
 }

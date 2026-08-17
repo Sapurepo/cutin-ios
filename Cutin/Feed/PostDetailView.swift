@@ -136,13 +136,14 @@ struct PostDetailView: View {
                         if count > 0 {
                             Text("\(count)")
                                 .font(Typography.chip)
-                                .foregroundStyle(mine ? palette.accentOn : palette.textSecondary)
+                                .foregroundStyle(mine ? palette.brandInk : palette.textSecondary)
                         }
                     }
                     .padding(.horizontal, Spacing.x2)
                     .padding(.vertical, Spacing.x1)
-                    .background(mine ? palette.accent : palette.surface, in: .capsule)
-                    .tokenBorder(Capsule(), color: mine ? .clear : palette.border)
+                    // 내 반응은 켜진 상태다 — 칩과 같은 규칙(웜 옅은 면 + 웜 테두리).
+                    .background(mine ? palette.brandSoft : palette.surface, in: .capsule)
+                    .tokenBorder(Capsule(), color: mine ? palette.brand : palette.border)
                 }
                 .buttonStyle(.plain)
             }
