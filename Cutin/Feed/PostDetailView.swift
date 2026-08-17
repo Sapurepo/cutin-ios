@@ -278,7 +278,7 @@ extension URL: @retroactive Identifiable {
 }
 
 /// 시스템 공유 시트. `ShareLink`와 달리 값이 나중에 생겨도 띄울 수 있다.
-private struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
