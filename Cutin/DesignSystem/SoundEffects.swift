@@ -1,8 +1,9 @@
 /* 효과음 — `Haptics`와 짝이다. iOS가 쓰는 **바로 그 소리**를 쓴다(사용자: "iOS의 사운드를 그대로").
- *   tap      부품을 눌렀다 — 설정 톱니 · 피드의 알림 종 · 촬영 설정의 배치 고르기 → 키보드 클릭
- *   tick     카운트다운 3·2, 마지막 1은 따로 → 카메라 앱 셀프타이머의 두 소리
- *   pop      반응을 남길 때 (Haptics.light와 함께) → iMessage 탭백을 보낼 때의 소리
- *   success  발행 완료 (Haptics.success와 함께) → iMessage 전송음(올라갔다)
+ *   tap        부품을 눌렀다 — 설정 톱니 · 피드의 알림 종 · 촬영 설정의 배치 고르기 → 키보드 클릭
+ *   tick       카운트다운 3·2, 마지막 1은 따로 → 카메라 앱 셀프타이머의 두 소리
+ *   pop        반응을 남길 때 (Haptics.light와 함께) → iMessage 탭백을 보낼 때의 소리
+ *   success    발행 완료 (Haptics.success와 함께) → iMessage 전송음(올라갔다)
+ *   toggle     효과음 설정을 켜고 끌 때 → 켜기 Tink(높게)·끄기 Tock(낮게)
  *
  * **셔터에는 얹지 않는다.** `AVCapturePhotoOutput`이 시스템 셔터음을 이미 내고, 한국·일본 기기는
  * 무음이어도 난다. 인트로에도 넣지 않는다.
@@ -33,10 +34,15 @@ enum SoundEffects {
     static func pop() { play(.pop) }
     static func success() { play(.success) }
 
+    /* 효과음 설정 자체를 켜고 끌 때. **`isEnabled` 게이트를 우회한다**(`force`) — 끄는 순간의
+     * 확인음마저 안 나면 "꺼졌다"는 피드백이 없어, 방금 무엇을 눌렀는지 알 수 없다. iOS 스위치도
+     * 조작 자체는 피드백을 준다. 무음 스위치는 `.ambient`라 그대로 존중한다. */
+    static func toggle(on: Bool) { play(on ? .toggleOn : .toggleOff, force: true) }
+
     // MARK: -
 
     private enum Sound {
-        case tap, tick, tickLast, pop, success
+        case tap, tick, tickLast, pop, success, toggleOn, toggleOff
 
         /// `/System/Library/Audio/UISounds/` 안의 파일 이름.
         var file: String {
@@ -46,6 +52,8 @@ enum SoundEffects {
             case .tickLast: "camera_timer_final_second"
             case .pop: "acknowledgment_sent"
             case .success: "SentMessage"
+            case .toggleOn: "Tink"
+            case .toggleOff: "Tock"
             }
         }
 
@@ -54,8 +62,9 @@ enum SoundEffects {
             switch self {
             case .tap: 1123
             case .tick, .tickLast: 1103
-            case .pop: 1104
+            case .pop, .toggleOn: 1103   // Tink
             case .success: 1004
+            case .toggleOff: 1104        // Tock
             }
         }
     }
@@ -74,8 +83,8 @@ enum SoundEffects {
         UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true
     }
 
-    private static func play(_ sound: Sound) {
-        guard isEnabled else { return }
+    private static func play(_ sound: Sound, force: Bool = false) {
+        guard force || isEnabled else { return }
         guard let player = player(for: sound) else {
             AudioServicesPlaySystemSound(sound.fallbackID)
             return
