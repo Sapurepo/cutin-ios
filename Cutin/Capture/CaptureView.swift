@@ -306,6 +306,7 @@ struct CaptureView: View {
             for tick in stride(from: 3, through: 1, by: -1) {
                 if Task.isCancelled { break }
                 withAnimation { countdown = tick }
+                SoundEffects.tick()   // 셔터 소리는 시스템이 낸다 — 여기서는 숫자만 울린다
                 try? await Task.sleep(for: .seconds(1))
             }
             if Task.isCancelled { break }
