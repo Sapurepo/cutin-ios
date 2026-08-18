@@ -62,7 +62,9 @@ struct ProfileView: View {
                 Menu {
                     NavigationLink("알림 설정", value: Route.notificationSettings)
                     // 효과음(`SoundEffects`)은 무음 스위치를 이미 따르므로 화면 하나를 만들 만큼이 아니다.
+                    // 켜고 끌 때 iOS 스위치 소리 — 끄는 순간의 확인음은 게이트를 우회해서 낸다.
                     Toggle("효과음", isOn: $soundEnabled)
+                        .onChange(of: soundEnabled) { _, on in SoundEffects.toggle(on: on) }
                     // §3.5 "도움말에서 재열람" — 온보딩 직후 한 번 본 팁을 다시 여는 자리다.
                     NavigationLink("도움말", value: Route.tips)
                     #if DEBUG
