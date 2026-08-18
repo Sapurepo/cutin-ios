@@ -114,6 +114,7 @@ struct CaptureSetupView: View {
                         ForEach(layouts, id: \.id) { template in
                             let selected = template.id == activeTemplate?.id
                             Button {
+                                SoundEffects.tap()
                                 templateId = template.id
                             } label: {
                                 VStack(spacing: Spacing.x2) {

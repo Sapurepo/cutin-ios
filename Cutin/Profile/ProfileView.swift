@@ -72,6 +72,9 @@ struct ProfileView: View {
                 } label: {
                     Image(systemName: "gearshape")
                 }
+                // Menu는 열리는 콜백이 없다 — 버튼 스타일로 눌림을 듣는다(`TapSoundButtonStyle`).
+                .menuStyle(.button)
+                .buttonStyle(TapSoundButtonStyle())
                 .accessibilityLabel("설정")
             }
         }
