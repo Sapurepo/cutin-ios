@@ -211,6 +211,7 @@ Cutin/
   Friends/              친구·팔로우·차단(SocialStore) · 타인 프로필 · 신고
   Archive/ Profile/     나머지 탭
   Resources/Fonts/      Pretendard(한글) · Geist(라틴 전용)
+  Resources/Sounds/     효과음 셋(tick · pop · success) — Scripts/sounds/make.py가 만든다
 Config/
   Shared.xcconfig       두 구성 공통 빌드 설정 (SWIFT_VERSION · 카카오 앱 키 포함)
   Debug/Release.xcconfig  구성별 설정 — 지금은 Shared를 include만 한다
@@ -231,6 +232,7 @@ Scripts/
   notifications/        알림·디바이스 검증 — 미읽음은 서버가 센 값 · 읽음 100개 분할 · 슬롯 하나 이상
   thumbnail/            대표 컷 검증 — 그리드 이미지 선택 · 고정 우선 정렬(순수 함수)
   audit/                UI 감사 — 시드 데이터 · 환경변수로 화면을 여는 훅 · 전 화면 스크린샷 · 콘택트 시트
+  sounds/               효과음 합성기 — 표준 라이브러리 + afconvert, 결과는 Cutin/Resources/Sounds/
 ```
 
 ```

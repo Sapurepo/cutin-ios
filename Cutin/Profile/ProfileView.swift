@@ -10,7 +10,7 @@
  * 그것을 세면 스크롤할수록 "포스트 수"가 늘어난다. 서버에 합계 API가 없으므로 세지 않는다 —
  * RN판의 하드코딩 통계를 이식하지 않은 것과 같은 이유다(거짓 수치는 없느니만 못하다).
  *
- * 설정(§8.3)은 메뉴 하나로 둔다 — 알림 설정과 로그아웃뿐이라 화면을 따로 만들 만큼이 아니다.
+ * 설정(§8.3)은 메뉴 하나로 둔다 — 알림 설정·효과음·로그아웃뿐이라 화면을 따로 만들 만큼이 아니다.
  * 약관·탈퇴는 아직 열 화면이 없다. */
 
 import SwiftUI
@@ -24,6 +24,7 @@ struct ProfileView: View {
 
     @State private var isEditingNickname = false
     @State private var nicknameDraft = ""
+    @AppStorage(SoundEffects.enabledKey) private var soundEnabled = true
 
     /// 3열 정사각 그리드 — 원본 RN판 프로필과 같은 밀도.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -60,6 +61,8 @@ struct ProfileView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     NavigationLink("알림 설정", value: Route.notificationSettings)
+                    // 효과음(`SoundEffects`)은 무음 스위치를 이미 따르므로 화면 하나를 만들 만큼이 아니다.
+                    Toggle("효과음", isOn: $soundEnabled)
                     // §3.5 "도움말에서 재열람" — 온보딩 직후 한 번 본 팁을 다시 여는 자리다.
                     NavigationLink("도움말", value: Route.tips)
                     #if DEBUG

@@ -205,6 +205,7 @@ struct PostDetailView: View {
     private func react(_ post: Post, _ type: ReactionType) async {
         notice = nil
         Haptics.light()
+        SoundEffects.pop()
         do {
             try await store.react(id: post.id, type: type)
         } catch {
