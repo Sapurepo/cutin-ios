@@ -11,6 +11,7 @@ import SwiftUI
 struct FeedView: View {
     @Environment(PostStore.self) private var store
     @Environment(NotificationStore.self) private var notifications
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.palette) private var palette
 
     var body: some View {
@@ -56,7 +57,11 @@ struct FeedView: View {
      * 개수를 숫자로 쓰지 않고 점만 찍는다 — 목록에 들어가면 어차피 다 보이고, 숫자를 쓰면
      * 읽음 처리가 늦게 반영될 때 그 오차가 눈에 띈다. */
     private var bell: some View {
-        NavigationLink(value: Route.notifications) {
+        // NavigationLink가 아니라 Button인 이유: 누르는 소리를 내려면 동작에 손이 닿아야 한다.
+        Button {
+            SoundEffects.tap()
+            coordinator.push(.notifications)
+        } label: {
             Image(systemName: "bell")
                 .overlay(alignment: .topTrailing) {
                     if notifications.unread > 0 {
