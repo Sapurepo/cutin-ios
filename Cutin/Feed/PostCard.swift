@@ -228,15 +228,4 @@ extension Post {
         guard let raw = cut?.media.url ?? composed?.url else { return nil }
         return URL(string: raw)
     }
-
-    /* 고정을 앞으로 — 프로필 그리드가 쓴다(내 프로필·타인 프로필 두 곳).
-     *
-     * `sorted`가 아니라 filter 둘을 잇는다. Swift의 `sorted`는 안정성을 보장하지 않아
-     * 같은 그룹 안의 서버 순서(발행 시각)가 뒤섞일 수 있다.
-     *
-     * **받아 온 페이지 안에서만 참이다** — 아직 안 받은 옛 포스트의 고정은 스크롤해야
-     * 나타난다. 서버 정렬 지원이 생기면 이 함수는 사라진다(0.3.0 범위 문서 참고). */
-    static func pinnedFirst(_ posts: [Post]) -> [Post] {
-        posts.filter(\.isPinned) + posts.filter { !$0.isPinned }
-    }
 }

@@ -200,11 +200,21 @@ final class PostStore {
 
     /* 고정 켜기/끄기(§6.3) — `PATCH { pinned }`. 발행된 포스트의 PATCH는 서버가 이 필드(와 대표 컷)만
      * 허용한다(cutin-backend#14) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
-     * 서버가 돌려준 포스트로 사전을 갱신하므로 그리드 순서(`pinnedFirst`)가 곧바로 따라온다. */
+     *
+     * 고정을 바꾸면 **그 사람 프로필 목록의 순서 자체가 바뀐다** — 서버가 고정을 맨 앞에 두고
+     * 커서가 `(pinned, publishedAt)` 복합키가 됐다(cutin-backend#15). 그래서 사전만 갱신하고 말면
+     * 이미 받아 둔 `ids`는 옛 순서 그대로다. 앱이 짐작해 끼워 넣지 않고 다시 받는 이유는
+     * `toggleBookmark`와 같다 — 짐작한 자리는 다음 페이지를 받을 때 서버가 줄 순서와 어긋난다.
+     *
+     * 다만 보관과 달리 `invalidate()`로 미루지 않고 **여기서 바로 받는다.** 고정은 프로필 화면이
+     * 떠 있는 채로(그 위 미리보기에서) 누르므로, 비워 두면 다시 채울 계기가 없어 그리드가
+     * 빈 채로 남는다. 보관 목록은 다른 탭이라 "다음에 열 때"가 성립한다. */
     func setPinned(id: UUID, _ pinned: Bool) async throws {
         var body = PatchPostBody()
         body.pinned = pinned
-        merge([try await client.send(.patch, "/posts/\(id.path)", body: body, as: Post.self)])
+        let updated = try await client.send(.patch, "/posts/\(id.path)", body: body, as: Post.self)
+        merge([updated])
+        await loadUser(id: updated.author.id, refresh: true)
     }
 
     /// 삭제. 서버가 soft delete라 목록에서도 빠진다.

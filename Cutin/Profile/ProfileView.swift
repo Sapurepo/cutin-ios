@@ -38,8 +38,10 @@ struct ProfileView: View {
         session.userId.map(store.userList(id:)) ?? PostStore.List()
     }
 
-    /// 직접 지정한 대표 컷이 있는 포스트를 맨 앞에 고정한다(§6.3 · 0.3.0 제품 결정).
-    private var posts: [Post] { Post.pinnedFirst(list.ids.compactMap(store.post(id:))) }
+    /* 순서는 **서버가 준 그대로**다 — 고정이 맨 앞이고 그 안에서 발행 시각 역순이다
+     * (§6.3 · cutin-backend#15). 앱에서 다시 정렬하지 않는 이유: 그 정렬은 받아 온 페이지
+     * 안에서만 참이라, 아직 안 받은 옛 고정 포스트가 뒤에 숨는다. */
+    private var posts: [Post] { list.ids.compactMap(store.post(id:)) }
 
     /* 큰 제목이 아니라 **인라인 제목**이다. 큰 제목 + `refreshable` + 화면보다 짧은 내용의 조합에서
      * 위로 밀면 제목이 반쯤 접힌 채 되돌아오지 않고, 실기기에서는 접힘/펼침이 반복되며 상단이
