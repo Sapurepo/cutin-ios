@@ -1,0 +1,3 @@
+# 모든 변경은 저장소 소유자(@wjsrbgus04)의 리뷰 승인을 받아야 병합됩니다.
+# GitHub ruleset "Protected: dev, main, release"의 require code owner review와 짝을 이룹니다.
+* @wjsrbgus04
