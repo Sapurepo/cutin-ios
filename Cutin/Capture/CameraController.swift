@@ -1,8 +1,9 @@
 /* AVFoundation 커스텀 카메라 — expo-camera(`apps/mobile/src/app/capture/camera.tsx`) 대체.
  *
  * 스레드 규약 (AVCaptureSession 조작은 메인 스레드를 블로킹하므로 반드시 지킬 것):
- *   - session / photoOutput / isConfigured / pending → `sessionQueue`에서만 만진다
- *   - 관찰 대상 프로퍼티(permission·isFront·isRunning·failure) → 메인에서만 쓴다
+ *   - session / photoOutput / isConfigured / pending / videoDevice → `sessionQueue`에서만 만진다
+ *   - 관찰 대상 프로퍼티(permission·isFront·isRunning·failure·zoomFactor·minZoom·maxZoom)
+ *     와 pinchBaseZoom → 메인에서만 쓴다
  * 이 규약 때문에 클래스에 @MainActor를 걸지 않고, 대신 규약을 근거로 @unchecked Sendable을 쓴다.
  *
  * 이전 구현에서 고친 것:
@@ -47,11 +48,28 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 프리뷰만 검게 두면 사용자는 앱이 고장 난 줄 알고, 되살릴 방법도 알 수 없다.
     private(set) var isUnavailable = false
 
+    /* 줌 — 메인 전용. 아이폰 카메라처럼 핀치로 당긴다. 표시 배율(`zoomFactor`)과 한계를
+     * 화면이 읽는다. 한계는 붙은 기기가 정한다(전면은 후면보다 좁다). 최소 1.0(가장 넓게),
+     * 최대는 기기 상한을 5배로 자른다 — 그 이상은 4컷 사진에서 화질이 뭉개져 의미가 없다. */
+    private(set) var zoomFactor: CGFloat = 1
+    private(set) var minZoom: CGFloat = 1
+    private(set) var maxZoom: CGFloat = 1
+
+    /// 당길 여지가 있는가 — 없으면 배율 표시를 숨긴다(전면이 최소=최대인 기기도 있다).
+    var canZoom: Bool { maxZoom > minZoom + 0.01 }
+
     let session = AVCaptureSession()
 
     @ObservationIgnored private let sessionQueue = DispatchQueue(label: "io.cutin.camera.session")
     @ObservationIgnored private let photoOutput = AVCapturePhotoOutput()
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    /// sessionQueue 전용 — 지금 붙어 있는 비디오 기기. 줌은 이 기기의 `videoZoomFactor`를 만진다.
+    @ObservationIgnored private var videoDevice: AVCaptureDevice?
+    /// 핀치가 시작될 때의 배율 — 제스처의 배수(magnification)를 여기에 곱한다.
+    @ObservationIgnored private var pinchBaseZoom: CGFloat = 1
+    /// 기기 상한을 이만큼으로 자른다 — 그 위는 4컷에서 화질이 무너진다.
+    private static let zoomCeiling: CGFloat = 5
 
     /// 메인 전용 — 화면이 카메라를 원하는가. `stop()` 뒤에 포그라운드 복귀 같은 이벤트로
     /// 세션이 되살아나면 프리뷰 없는 화면에서 카메라가 돌아간다(프라이버시 표시등·배터리).
@@ -229,7 +247,24 @@ final class CameraController: NSObject, @unchecked Sendable {
               session.canAddInput(input)
         else { return false }
         session.addInput(input)
+        adoptZoomDevice(device)
         return true
+    }
+
+    /// sessionQueue 전용. 새 기기가 붙을 때 줌을 1.0으로 되돌리고 한계를 화면에 알린다.
+    private func adoptZoomDevice(_ device: AVCaptureDevice) {
+        videoDevice = device
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = device.minAvailableVideoZoomFactor
+            device.unlockForConfiguration()
+        }
+        let lo = device.minAvailableVideoZoomFactor
+        let hi = min(device.maxAvailableVideoZoomFactor, Self.zoomCeiling)
+        DispatchQueue.main.async {
+            self.minZoom = lo
+            self.maxZoom = max(lo, hi)
+            self.zoomFactor = lo
+        }
     }
 
     private static func device(front: Bool) -> AVCaptureDevice? {
@@ -282,6 +317,32 @@ final class CameraController: NSObject, @unchecked Sendable {
             if !switched {
                 DispatchQueue.main.async { self.isFront = facing }
             }
+        }
+    }
+
+    // MARK: - 줌
+
+    /// 핀치 시작 — 지금 배율을 기준으로 잡는다(메인). 이 값에 제스처 배수를 곱한다.
+    func beginPinch() {
+        pinchBaseZoom = zoomFactor
+    }
+
+    /// 핀치 진행 — 시작 배율 × 제스처 배수. 아이폰 카메라와 같은 감각.
+    func updatePinch(scale: CGFloat) {
+        setZoom(pinchBaseZoom * scale)
+    }
+
+    /// 배율을 한계 안으로 맞춰 기기에 건다. 화면에는 실제로 걸린 값을 돌려준다.
+    func setZoom(_ factor: CGFloat) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.videoDevice else { return }
+            let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
+                              min(device.maxAvailableVideoZoomFactor, Self.zoomCeiling))
+            if (try? device.lockForConfiguration()) != nil {
+                device.videoZoomFactor = clamped
+                device.unlockForConfiguration()
+            }
+            DispatchQueue.main.async { self.zoomFactor = clamped }
         }
     }
 

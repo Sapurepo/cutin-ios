@@ -11,24 +11,39 @@ import SwiftUI
 struct FeedView: View {
     @Environment(PostStore.self) private var store
     @Environment(NotificationStore.self) private var notifications
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.palette) private var palette
 
     var body: some View {
         PostList(
             list: store.feed,
             posts: store.feed.ids.compactMap(store.post(id:)),
+            // 빈 피드의 그림은 빈 스트립 — 로그인·팁과 같은 물건이라 "찍으면 여기 이렇게 온다"가 보인다.
             empty: EmptyStateView(
                 title: "아직 남긴 컷이 없어요",
-                message: "가운데 촬영 버튼으로 첫 컷을 찍어보세요",
-                systemImage: AppTab.home.systemImage
-            ),
+                message: "가운데 촬영 버튼으로 첫 컷을 찍어보세요"
+            ) {
+                StripArt(layout: .strip4, skin: .white, width: 64, filled: 0)
+                    .rotationEffect(.degrees(-4))
+                    .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
+            },
             loadMore: { await store.loadFeed() },
             refresh: { await store.loadFeed(refresh: true) }
         )
         .background(palette.bg)
         .navigationTitle("CUTIN")
+        /* 인라인 + 워드마크. 큰 제목은 시스템 서체라 로그인·인트로의 Geist 로고와 다른 글자였다
+         * (감사 G2). 다른 탭도 인라인이라 상단 높이가 탭마다 달라지지 않는다. */
+        .navigationBarTitleDisplayMode(.inline)
         .routeDestinations()
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("CUTIN")
+                    .font(Typography.logo(size: 18))
+                    .kerning(18 * Typography.logoKerning)
+                    .foregroundStyle(palette.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+            }
             ToolbarItem(placement: .primaryAction) { bell }
         }
         .task {
@@ -42,17 +57,22 @@ struct FeedView: View {
      * 개수를 숫자로 쓰지 않고 점만 찍는다 — 목록에 들어가면 어차피 다 보이고, 숫자를 쓰면
      * 읽음 처리가 늦게 반영될 때 그 오차가 눈에 띈다. */
     private var bell: some View {
-        NavigationLink(value: Route.notifications) {
+        // NavigationLink가 아니라 Button인 이유: 누르는 소리를 내려면 동작에 손이 닿아야 한다.
+        Button {
+            SoundEffects.tap()
+            coordinator.push(.notifications)
+        } label: {
             Image(systemName: "bell")
                 .overlay(alignment: .topTrailing) {
                     if notifications.unread > 0 {
                         Circle()
-                            .fill(palette.accent)
+                            .fill(palette.brand)
                             .frame(width: 8, height: 8)
                             .offset(x: 4, y: -2)
                     }
                 }
         }
+        .accessibilityLabel(notifications.unread > 0 ? "알림, 안 읽은 알림 있음" : "알림")
     }
 }
 
@@ -72,9 +92,8 @@ struct PostList<Empty: View>: View {
             if !posts.isEmpty {
                 content
             } else if list.isLoading || !list.hasLoaded {
-                ProgressView()
-                    .tint(palette.textSecondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // 스피너 대신 카드 자리 — 받는 동안에도 화면이 "피드"로 보인다(감사 G4).
+                skeleton
             } else if let failure = list.failure {
                 /* 실패와 빈 목록을 가른다. 실패했는데 "아직 남긴 컷이 없어요"를 보여주면
                  * 사용자는 자기 포스트가 사라진 줄 안다. */
@@ -90,9 +109,33 @@ struct PostList<Empty: View>: View {
         .refreshable { await refresh() }
     }
 
+    /* 카드 두 장의 자리 — 세로 3:4 이미지 자리와 작성자 행. 반짝임은 `Shimmer`. */
+    private var skeleton: some View {
+        ScrollView {
+            VStack(spacing: Spacing.x8) {
+                ForEach(0..<2, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: Spacing.x3) {
+                        RoundedRectangle(cornerRadius: Radius.md)
+                            .fill(palette.surfaceSunken)
+                            .aspectRatio(3 / 4, contentMode: .fit)
+                            .overlay { Shimmer().clipShape(.rect(cornerRadius: Radius.md)) }
+                        HStack(spacing: Spacing.x2) {
+                            Circle().fill(palette.surfaceSunken).frame(width: 26, height: 26)
+                            RoundedRectangle(cornerRadius: 4).fill(palette.surfaceSunken)
+                                .frame(width: 88, height: 12)
+                        }
+                    }
+                }
+            }
+            .padding(Spacing.x4)
+        }
+        .scrollDisabled(true)
+        .accessibilityLabel("불러오는 중")
+    }
+
     private var content: some View {
         ScrollView {
-            LazyVStack(spacing: Spacing.x6) {
+            LazyVStack(spacing: Spacing.x8) {
                 ForEach(posts, id: \.id) { post in
                     NavigationLink(value: Route.postDetail(post.id)) {
                         PostCard(post: post)

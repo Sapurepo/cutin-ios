@@ -6,8 +6,10 @@
  *   ① `Post.gridImageURL` — **배열 위치가 아니라 `cutIndex`로** 찾는지. 계약이 컷 배열의
  *      순서를 약속하지 않으므로, 서버가 순서를 바꿔 보내는 날 `cuts[n]`은 조용히 다른 컷을
  *      그린다. 폴백 사다리(지정 → 첫 컷 → 합성본 → nil)도 함께 본다.
- *   ② `Post.pinnedFirst` — 고정을 앞으로 보내되 **각 그룹 안의 서버 순서를 보존**하는지.
- *      `sorted`로 짜면 Swift가 안정성을 보장하지 않아 발행 순서가 은근히 섞인다.
+ *   ② `Post.isPinned` — 서버가 준 `pinned`가 답이고, 없을 때만 대표 컷 인덱스로 가르는지.
+ *
+ * 고정 순서 검사는 없다 — 정렬이 서버로 넘어갔다(cutin-backend#15). `Post.pinnedFirst`도 함께
+ * 사라졌다: 앱에서 다시 정렬하면 받아 온 페이지 안에서만 맞아 옛 고정 포스트가 뒤에 숨는다.
  *
  * 실행: SIMCTL_CHILD_THUMBNAIL_CHECK=1 로 앱을 띄우면 stdout에 결과를 뱉는다. 서명 불필요. */
 
@@ -24,16 +26,15 @@ enum ThumbnailHarness {
 
     static func run() {
         checkGridImage()
-        checkPinnedFirst()
         print("=== 결과: \(failures == 0 ? "전부 통과" : "실패 \(failures)건") ===")
         fflush(stdout)
         exit(failures == 0 ? 0 : 1)
     }
 
-    // MARK: - ① gridImageURL
+    // MARK: - ①② gridImageURL · isPinned
 
     private static func checkGridImage() {
-        print("=== ① gridImageURL — cutIndex로 찾는다 ===")
+        print("=== ① gridImageURL — cutIndex로 찾는다 · ② isPinned ===")
 
         /* 컷 배열을 **역순으로** 담는다. 배열 위치로 찾는 구현은 여기서 틀린 컷을 내놓는다 —
          * 순서대로 담으면 두 구현이 같은 답을 내서 검사가 아무것도 가르지 못한다. */
@@ -60,44 +61,24 @@ enum ThumbnailHarness {
         expect(bare.gridImageURL == nil, "아무것도 없으면 nil",
                bare.gridImageURL?.absoluteString ?? "nil")
 
-        expect(post(cutIndexes: [0], thumbnail: 0).isPinned, "지정하면 고정")
+        expect(post(cutIndexes: [0, 1], thumbnail: 1).isPinned, "첫 컷이 아닌 것을 지정하면 고정")
         expect(!post(cutIndexes: [0], thumbnail: nil).isPinned, "미지정은 고정이 아니다")
-    }
-
-    // MARK: - ② pinnedFirst
-
-    private static func checkPinnedFirst() {
-        print("=== ② pinnedFirst — 그룹 안 순서 보존 ===")
-
-        // 발행 순서: A(고정) B C(고정) D E(고정). 기대: A C E B D — 그룹 안은 그대로.
-        let mixed = [
-            post(name: "A", cutIndexes: [0], thumbnail: 0),
-            post(name: "B", cutIndexes: [0], thumbnail: nil),
-            post(name: "C", cutIndexes: [0], thumbnail: 0),
-            post(name: "D", cutIndexes: [0], thumbnail: nil),
-            post(name: "E", cutIndexes: [0], thumbnail: 0),
-        ]
-        let ordered = Post.pinnedFirst(mixed).map(\.caption)
-        expect(ordered == ["A", "C", "E", "B", "D"],
-               "고정 앞으로 + 그룹 안 발행 순서 보존", "\(ordered.map { $0 ?? "?" })")
-
-        expect(Post.pinnedFirst([]).isEmpty, "빈 목록")
-
-        let none = [post(name: "A", cutIndexes: [0], thumbnail: nil),
-                    post(name: "B", cutIndexes: [0], thumbnail: nil)]
-        expect(Post.pinnedFirst(none).map(\.caption) == ["A", "B"],
-               "고정이 없으면 그대로")
-
-        let all = [post(name: "A", cutIndexes: [0], thumbnail: 0),
-                   post(name: "B", cutIndexes: [0], thumbnail: 0)]
-        expect(Post.pinnedFirst(all).map(\.caption) == ["A", "B"],
-               "전부 고정이어도 순서 그대로 — 고정끼리는 발행 순이다")
+        /* 서버는 발행 시 미지정을 0으로 채운다 — 발행된 포스트는 전부 non-null이다. nil 검사로
+         * 가르면 전 셀에 핀이 붙는다(2026-08-17 감사 B3). 0은 기본과 같은 그림이라 고정이 아니다. */
+        expect(!post(cutIndexes: [0, 1], thumbnail: 0).isPinned,
+               "0은 서버가 채우는 기본 — 고정이 아니다")
+        /* 서버가 `pinned`를 주면(cutin-backend#14) 그 값이 답이다 — 대표 컷과 별개. 대표 컷 없이
+         * 고정만 켤 수도, 대표 컷을 골랐지만 고정을 풀 수도 있다. */
+        expect(post(cutIndexes: [0, 1], thumbnail: 0, pinned: true).isPinned,
+               "pinned=true면 대표 컷이 기본이어도 고정")
+        expect(!post(cutIndexes: [0, 1], thumbnail: 1, pinned: false).isPinned,
+               "pinned=false면 대표 컷을 골랐어도 고정이 아니다")
     }
 
     // MARK: - 표본
 
     private static func post(name: String = "P", cutIndexes: [Int], thumbnail: Int?,
-                             composed: Bool = true) -> Post {
+                             pinned: Bool? = nil, composed: Bool = true) -> Post {
         let template = Template(id: UUID(), code: "grid4", name: "네 컷", cutCount: 4,
                                 aspectRatio: "1:1",
                                 slots: [TemplateSlot(x: 0, y: 0, width: 1, height: 1)])
@@ -106,7 +87,7 @@ enum ThumbnailHarness {
             author: PostAuthor(id: UUID(), nickname: name, avatarUrl: nil),
             template: template, frame: nil,
             status: ServerEnum(.published), visibility: ServerEnum(.friends),
-            caption: name, thumbnailCutIndex: thumbnail,
+            caption: name, thumbnailCutIndex: thumbnail, pinned: pinned,
             cuts: cutIndexes.map { index in
                 PostCut(cutIndex: index, media: media(url: "https://cut/\(index)"))
             },

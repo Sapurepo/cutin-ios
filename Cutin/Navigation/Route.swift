@@ -11,14 +11,18 @@ import Foundation
 
 enum Route: Hashable {
     case postDetail(UUID)
+    /// 같은 상세인데 **댓글 입력칸에 포커스**를 주고 연다 — 미리보기의 "댓글"이 쓴다.
+    case postComments(UUID)
     /// 타인 프로필(§9). 내 프로필은 탭이라 여기 오지 않는다.
     case userProfile(UUID)
-    /// 댓글 목록(§7.2). 상세에서 푸시한다 — 시트로 띄우면 키보드와 겹쳐 목록이 반쪽이 된다.
-    case comments(UUID)
     /// 인앱 알림(§10). 탭이 아니라 피드 툴바에서 푸시한다 — 5탭은 명세로 확정돼 있다.
     case notifications
     /// 알림 설정(§3.3 슬롯 · §8.3 설정). 프로필에서 푸시한다.
     case notificationSettings
     /// 서비스 팁 재열람(§3.5 "도움말에서 재열람"). 프로필 설정 메뉴에서 푸시한다.
     case tips
+    #if DEBUG
+    /// 디자인 카탈로그 — Debug 빌드의 프로필 메뉴에서만 연다(`DesignCatalogView`).
+    case designCatalog
+    #endif
 }

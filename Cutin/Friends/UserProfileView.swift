@@ -18,6 +18,7 @@ struct UserProfileView: View {
 
     @Environment(SocialStore.self) private var social
     @Environment(PostStore.self) private var posts
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.palette) private var palette
 
     @State private var isConfirmingBlock = false
@@ -61,6 +62,7 @@ struct UserProfileView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                 }
+                .accessibilityLabel("더보기")
             }
         }
         .confirmationDialog("이 사람을 차단할까요?", isPresented: $isConfirmingBlock,
@@ -86,11 +88,11 @@ struct UserProfileView: View {
             AvatarView(url: profile.avatarUrl, nickname: profile.nickname)
 
             Text(profile.nickname ?? "이름 없음")
-                .font(Typography.headline)
+                .font(Typography.title)
                 .foregroundStyle(palette.textPrimary)
 
             Text("친구 \(profile.friendCount)명")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
 
             if !profile.blocking { followButton(profile) }
@@ -106,14 +108,24 @@ struct UserProfileView: View {
 
     /* 버튼 문구가 관계를 말한다. **"팔로우"와 "맞팔로우"를 가르는 이유**: 상대가 이미 나를
      * 팔로우 중이면 누르는 순간 친구가 된다 — 그 결과를 미리 알려주는 편이 정직하다. */
+    /* 이미 팔로우 중이면 **채우지 않은** 글래스다. 전에는 prominent에 tint만 surface로 줬는데,
+     * prominent의 라벨색은 흰색이라 라이트 모드에서 흰 알약 위의 흰 글씨가 됐다
+     * (2026-08-17 감사 B1). 채움 여부가 곧 "누르면 관계가 생긴다/끊긴다"를 가른다. */
+    @ViewBuilder
     private func followButton(_ profile: PublicProfile) -> some View {
-        Button {
-            Task { await toggleFollow() }
-        } label: {
-            Text(label(for: profile)).primaryGlassLabel()
+        if profile.following {
+            Button { Task { await toggleFollow() } } label: {
+                Text(label(for: profile)).glassLabel()
+            }
+            .buttonStyle(.glass)
+            .padding(.horizontal, Spacing.x8)
+        } else {
+            Button { Task { await toggleFollow() } } label: {
+                Text(label(for: profile)).primaryGlassLabel()
+            }
+            .primaryGlassButton(tint: palette.accent)
+            .padding(.horizontal, Spacing.x8)
         }
-        .primaryGlassButton(tint: profile.following ? palette.surface : palette.accent)
-        .padding(.horizontal, Spacing.x8)
     }
 
     private func label(for profile: PublicProfile) -> String {
@@ -144,7 +156,7 @@ struct UserProfileView: View {
 
     private var blockedNotice: some View {
         Text("차단한 사람이에요. 서로의 컷이 보이지 않아요")
-            .font(Typography.caption)
+            .font(Typography.body)
             .foregroundStyle(palette.textSecondary)
             .padding(.top, Spacing.x8)
     }
@@ -154,8 +166,8 @@ struct UserProfileView: View {
     @ViewBuilder
     private var grid: some View {
         let list = posts.userList(id: id)
-        // 내 프로필과 같은 고정 규칙 — 대표 컷을 지정한 포스트가 맨 앞이다(§6.3).
-        let items = Post.pinnedFirst(list.ids.compactMap(posts.post(id:)))
+        // 내 프로필과 같다 — 순서는 서버가 준 그대로이고 고정이 맨 앞이다(§6.3 · cutin-backend#15).
+        let items = list.ids.compactMap(posts.post(id:))
 
         if items.isEmpty {
             if list.isLoading || !list.hasLoaded {
@@ -164,17 +176,17 @@ struct UserProfileView: View {
                 /* 볼 수 없는 것과 없는 것을 가르지 않는다 — 서버가 공개 범위로 걸러 주므로
                  * 앱은 어느 쪽인지 모르고, 알려 주면 그 자체가 정보 노출이다. */
                 Text("보여줄 컷이 없어요")
-                    .font(Typography.caption)
+                    .font(Typography.body)
                     .foregroundStyle(palette.textSecondary)
                     .padding(.top, Spacing.x8)
             }
         } else {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(items, id: \.id) { post in
-                    NavigationLink(value: Route.postDetail(post.id)) {
-                        PostThumbnail(post: post)
-                    }
-                    .buttonStyle(.plain)
+                    // 내 프로필과 같은 셀 — 짧게 상세, 길게 미리보기(고정 해제는 내 것에만 뜬다).
+                    PostGridCell(post: post,
+                                 onTap: { coordinator.push(.postDetail(post.id)) },
+                                 onLongPress: { coordinator.peekPostId = post.id })
                 }
                 if list.nextCursor != nil {
                     ProgressView().task { await posts.loadUser(id: id) }

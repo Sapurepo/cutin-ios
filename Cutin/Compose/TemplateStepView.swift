@@ -27,9 +27,23 @@ struct TemplateStepView: View {
             if layouts.count > 1 {
                 chips(title: "배치") {
                     ForEach(layouts, id: \.id) { item in
-                        CutinChip(label: item.name, selected: item.id == flow.template?.id) {
+                        let selected = item.id == flow.template?.id
+                        // 이름 앞에 배치 글리프 — 어떤 모양인지 눌러 보지 않고도 안다.
+                        Button {
                             flow.select(template: item)
+                        } label: {
+                            HStack(spacing: Spacing.x2) {
+                                TemplateGlyph(template: item, height: 16, selected: selected)
+                                Text(item.name)
+                                    .font(selected ? Typography.font(.body, .semibold, size: 12) : Typography.chip)
+                                    .foregroundStyle(selected ? palette.brandInk : palette.textPrimary)
+                            }
+                            .padding(.horizontal, Spacing.x3)
+                            .padding(.vertical, Spacing.x2)
+                            .background(selected ? palette.brandSoft : palette.surface, in: .capsule)
+                            .tokenBorder(Capsule(), color: selected ? palette.brand : palette.border)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -53,8 +67,7 @@ struct TemplateStepView: View {
         .padding(.top, Spacing.x4)
         .padding(.bottom, Spacing.x6)
         .background(palette.bg)
-        .navigationTitle("템플릿")
-        .navigationBarTitleDisplayMode(.inline)
+        .editStepTitle("템플릿", step: 1)
     }
 
     private func chips<Content: View>(
@@ -63,7 +76,7 @@ struct TemplateStepView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text(title)
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
 
             ScrollView(.horizontal, showsIndicators: false) {

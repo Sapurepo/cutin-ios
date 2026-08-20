@@ -110,7 +110,9 @@ final class PostPublisher {
             .post, "/posts/\(draft.id.path)/publish",
             body: PublishPostBody(
                 composedMediaId: composed.id,
-                visibility: ServerEnum(request.visibility)
+                visibility: ServerEnum(request.visibility),
+                // 대표 컷을 직접 골랐으면 고정(0.3.0 제품 결정) — 첫 컷을 골라도 고정이다.
+                pinned: request.thumbnailCutIndex != nil
             ),
             as: Post.self
         )

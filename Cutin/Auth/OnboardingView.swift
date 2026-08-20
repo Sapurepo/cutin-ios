@@ -33,20 +33,29 @@ struct OnboardingView: View {
     @FocusState private var isFocused: Bool
 
     /// 서버에 이미 저장된 닉네임. 저장은 됐는데 온보딩이 닫히지 않은 채 다시 들어온 경우다.
+    private let saved: String?
+
     init(saved: String?) {
+        self.saved = saved
         _nickname = State(initialValue: saved ?? "")
     }
 
     private var trimmed: String { nickname.trimmingCharacters(in: .whitespaces) }
 
+    /* 위에서부터 읽는 순서대로 쌓는다 — 제목 → 사진 → 이름 → 시작. 0.3.0은 가운데 정렬로
+     * 요소가 큰 빈 공간을 두고 흩어져 있었다(0.4.0 감사). 남는 공간은 아래 한 곳에만 둔다.
+     * 키보드가 올라오면 그 공간이 먼저 줄어들고 CTA는 키보드 위에 붙는다. */
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer()
-            heading
-            avatar.padding(.top, Spacing.x6)
-            field.padding(.top, Spacing.x5)
+            heading.padding(.top, Spacing.x8)
+            avatar.padding(.top, Spacing.x8)
+            field.padding(.top, Spacing.x6)
             hintLine.padding(.top, Spacing.x2)
-            Spacer()
+            Text("이름은 나중에 프로필에서 바꿀 수 있어요")
+                .font(Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+                .padding(.top, Spacing.x1)
+            Spacer(minLength: Spacing.x6)
             if let failure = session.failure { failureNotice(failure) }
             startButton.padding(.top, Spacing.x3)
             Spacer().frame(height: Spacing.x8)
@@ -62,12 +71,11 @@ struct OnboardingView: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
-            // 이 크기를 쓰는 곳이 여기뿐이라 토큰으로 승격하지 않는다(호출부 2곳 규칙).
             Text("어떻게 불러드릴까요?")
-                .font(Typography.font(.body, .bold, size: 22))
+                .font(Typography.largeTitle)
                 .foregroundStyle(palette.textPrimary)
-            Text("컷을 남기면 이 이름으로 보여요")
-                .font(Typography.bodyText)
+            Text("컷을 남기면 친구에게 이 이름으로 보여요")
+                .font(Typography.body)
                 .foregroundStyle(palette.textSecondary)
         }
     }
@@ -84,6 +92,8 @@ struct OnboardingView: View {
         return nil
     }
 
+    /* 입력칸은 떠 있는 면(`raised`) 위에, 포커스는 웜 테두리 — "지금 켜져 있는 것"의 색이다.
+     * 사용 불가 판정만 danger로 바뀐다. */
     private var field: some View {
         TextField("닉네임", text: $nickname)
             .font(Typography.headline)
@@ -94,15 +104,17 @@ struct OnboardingView: View {
             .submitLabel(.done)
             .onSubmit(submit)
             .padding(Spacing.x4)
-            .background(palette.surface, in: .rect(cornerRadius: Radius.md))
-            .tokenBorder(RoundedRectangle(cornerRadius: Radius.md), color: borderColor)
+            .raised(cornerRadius: Radius.md)
+            .tokenBorder(RoundedRectangle(cornerRadius: Radius.md), color: borderColor,
+                         lineWidth: isFocused ? 1.5 : 1)
+            .animation(Motion.quick, value: isFocused)
     }
 
     /* 확인 결과 한 줄. 자리를 항상 차지하게 두어 문구가 나타날 때 아래가 밀리지 않는다.
      * 확인 중에는 이전 결과를 지운다 — 옛 판정을 새 입력에 대한 답처럼 보여주면 안 된다. */
     private var hintLine: some View {
         Text(hint)
-            .font(Typography.caption)
+            .font(Typography.label)
             .foregroundStyle(hintColor)
             .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
             .animation(.easeOut(duration: Duration.fast), value: hint)
@@ -136,7 +148,14 @@ struct OnboardingView: View {
 
     private func check() async {
         availability = nil
+        // 취소된 이전 확인이 "확인 중…"을 켜 둔 채 끝났을 수 있다 — 새 확인은 꺼진 상태에서 시작한다.
+        isChecking = false
         guard !trimmed.isEmpty else { return }
+        /* 내 이름은 묻지 않는다. 서버의 가용성 검사는 본인을 제외하지 않아 저장된 닉네임 그대로면
+         * "이미 누군가 쓰고 있어요"가 뜨고 시작 버튼이 잠긴다 — 이름을 바꾸지 않으면 나갈 수
+         * 없는 화면이 된다(2026-08-17 감사 B5). 저장 경로(`completeOnboarding`)는 같은 이름이면
+         * PATCH를 건너뛰므로 여기서도 건너뛰는 것이 맞다. 대소문자는 서버가 lower로 비교한다. */
+        if let saved, trimmed.lowercased() == saved.lowercased() { return }
 
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { return }
@@ -170,12 +189,12 @@ struct OnboardingView: View {
 
     private var hintColor: Color {
         guard let availability, !isChecking else { return palette.textSecondary }
-        return availability.available ? palette.textSecondary : palette.danger
+        return availability.available ? palette.brandInk : palette.danger
     }
 
     private var borderColor: Color {
         guard let availability, !isChecking, !availability.available else {
-            return isFocused ? palette.borderStrong : palette.border
+            return isFocused ? palette.brand : palette.border
         }
         return palette.danger
     }

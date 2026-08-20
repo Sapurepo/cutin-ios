@@ -12,16 +12,20 @@ extension View {
             switch route {
             case .postDetail(let id):
                 PostDetailView(id: id)
+            case .postComments(let id):
+                PostDetailView(id: id, focusesComposer: true)
             case .userProfile(let id):
                 UserProfileView(id: id)
-            case .comments(let id):
-                CommentsView(postId: id)
             case .notifications:
                 NotificationsView()
             case .notificationSettings:
                 NotificationSettingsView()
             case .tips:
                 TipsView(onStart: nil)
+            #if DEBUG
+            case .designCatalog:
+                DesignCatalogView()
+            #endif
             }
         }
     }

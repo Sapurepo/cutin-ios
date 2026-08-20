@@ -285,6 +285,9 @@ struct Post: Decodable, Sendable, Hashable {
     let caption: String?
     /// 명세 §6.3 대표 컷. 0.1.0에서 소비처가 없어 미구현이었는데 서버에 필드가 있다.
     let thumbnailCutIndex: Int?
+    /* 프로필 그리드 맨 앞 고정(§6.3). 대표 컷과 **별개**의 값이다(cutin-backend#14).
+     * 옵셔널인 이유: 그 전 서버는 이 필드가 없다 — 그때는 `isPinned`가 대표 컷 인덱스로 가른다. */
+    let pinned: Bool?
     let cuts: [PostCut]
     /// **iOS가 만든 합성본.** draft에는 없으므로 null이다 — required이면서 nullable이다.
     let composed: Media?
@@ -324,6 +327,8 @@ struct PatchPostBody: Encodable, Sendable {
     var caption: Field<String>?
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Field<Int>?
+    /// 프로필 맨 앞 고정. 발행 뒤에도 이 필드(와 대표 컷)만은 PATCH할 수 있다(cutin-backend#14).
+    var pinned: Bool?
     var cuts: [CutInput]?
 }
 
@@ -332,6 +337,8 @@ struct PublishPostBody: Encodable, Sendable {
     var caption: Field<String>?
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Int?
+    /// 발행과 함께 고정 — 대표 컷을 직접 고른 포스트가 켠다(0.3.0 제품 결정).
+    var pinned: Bool?
 }
 
 /* 보관 토글 응답. `PUT`은 `true`, `DELETE`는 `false`를 돌려준다 —

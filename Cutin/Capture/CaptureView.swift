@@ -10,11 +10,14 @@ struct CaptureView: View {
 
     @State private var camera = CameraController()
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppCoordinator.self) private var coordinator
 
     @State private var countdown: Int?
     @State private var countdownTask: Task<Void, Never>?
     @State private var isShooting = false
     @State private var failure: CameraController.CaptureError?
+    /// 핀치가 진행 중인지 — 제스처 한 번의 시작에서만 기준 배율을 잡기 위해서다.
+    @State private var isPinching = false
 
     private let ink = Palette.dark
 
@@ -45,7 +48,7 @@ struct CaptureView: View {
 
     private var topBar: some View {
         HStack {
-            iconButton("xmark") {
+            iconButton("xmark", label: "닫기") {
                 countdownTask?.cancel()
                 dismiss()
             }
@@ -55,7 +58,7 @@ struct CaptureView: View {
                 .padding(.vertical, Spacing.x1)
                 .glassEffect(.regular, in: .capsule)
             Spacer()
-            iconButton("arrow.trianglehead.2.clockwise.rotate.90.camera") {
+            iconButton("arrow.trianglehead.2.clockwise.rotate.90.camera", label: "카메라 전환") {
                 camera.toggleFacing()
             }
         }
@@ -63,13 +66,14 @@ struct CaptureView: View {
         .padding(.vertical, Spacing.x3)
     }
 
-    private func iconButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: Layout.tapTarget, height: Layout.tapTarget)
         }
+        .accessibilityLabel(label)
     }
 
     // MARK: - 뷰파인더
@@ -83,6 +87,8 @@ struct CaptureView: View {
             case .granted:
                 CameraPreview(session: camera.session)
                     .ignoresSafeArea(edges: .horizontal)
+                    // 핀치로 줌 — 아이폰 카메라와 같은 감각. 프리뷰 위에서만 잡아 셔터·썸네일과 안 겹친다.
+                    .gesture(pinchToZoom)
 
                 if let countdown {
                     ZStack {
@@ -98,6 +104,16 @@ struct CaptureView: View {
 
                 VStack {
                     Spacer()
+                    if camera.canZoom {
+                        Text(zoomLabel)
+                            .font(Typography.font(.latin, .semibold, size: 13))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, Spacing.x2)
+                            .padding(.vertical, Spacing.x1)
+                            .glassEffect(.regular, in: .capsule)
+                            .padding(.bottom, Spacing.x2)
+                            .accessibilityLabel("배율 \(zoomLabel)")
+                    }
                     if let failure {
                         failureLabel(failure)
                     }
@@ -127,6 +143,24 @@ struct CaptureView: View {
             return "\(index + 1)번째 컷 다시 찍기"
         }
         return "\(flow.nextSlot) / \(flow.cutCount)"
+    }
+
+    /// "1.0×" — 아이폰 카메라와 같은 표기. 소수 한 자리면 미세한 핀치도 눈에 보인다.
+    private var zoomLabel: String {
+        String(format: "%.1f×", camera.zoomFactor)
+    }
+
+    /// 프리뷰 위 핀치. 제스처 한 번의 시작에서만 기준 배율을 잡고(`beginPinch`), 이후 배수를 곱한다.
+    private var pinchToZoom: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                if !isPinching {
+                    camera.beginPinch()
+                    isPinching = true
+                }
+                camera.updatePinch(scale: value.magnification)
+            }
+            .onEnded { _ in isPinching = false }
     }
 
     /* 촬영 실패를 조용히 넘기면 사용자는 셔터가 고장 난 줄 안다 — 이전 구현은 `try?`로 삼켰다.
@@ -168,7 +202,7 @@ struct CaptureView: View {
                 .multilineTextAlignment(.center)
 
             Button("다시 시도") { camera.start() }
-                .primaryGlassButton(tint: .white)
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
         }
         .padding(Spacing.x6)
         .tint(.white)
@@ -176,24 +210,39 @@ struct CaptureView: View {
 
     private var permissionBox: some View {
         VStack(spacing: Spacing.x4) {
-            Text("컷 촬영을 위해\n카메라 권한이 필요해요")
-                .font(Typography.buttonLabel)
+            Image(systemName: "camera")
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.white.opacity(0.7))
+            Text("컷을 찍으려면\n카메라를 열어야 해요")
+                .font(Typography.title)
                 .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Text(camera.permission == .denied
+                 ? "설정에서 카메라를 허용하면 바로 찍을 수 있어요"
+                 : "허용을 누르면 지금 찍을 수 있어요")
+                .font(Typography.body)
+                .foregroundStyle(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
 
             if camera.permission == .denied {
                 // iOS는 한 번 거부된 뒤 앱이 다시 묻는 것을 허용하지 않는다.
-                Button("설정에서 허용") {
+                Button {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     UIApplication.shared.open(url)
+                } label: {
+                    Text("설정에서 허용").glassLabel().foregroundStyle(Palette.light.accent)
                 }
-                .buttonStyle(.glass)
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
             } else {
-                Button("카메라 권한 허용") { camera.start() }
-                    .primaryGlassButton(tint: .white)
+                Button {
+                    camera.start()
+                } label: {
+                    Text("카메라 허용").glassLabel().foregroundStyle(Palette.light.accent)
+                }
+                .primaryGlassButton(tint: .white, label: Palette.light.accent)
             }
         }
-        .padding(Spacing.x6)
+        .padding(Spacing.x8)
         .tint(.white)
     }
 
@@ -218,9 +267,9 @@ struct CaptureView: View {
                                 .scaledToFill()
                         }
                     }
-                    .frame(width: 40, height: 40)
-                    .clipShape(.rect(cornerRadius: 8))
-                    .tokenBorder(RoundedRectangle(cornerRadius: 8),
+                    .frame(width: 48, height: 48)
+                    .clipShape(.rect(cornerRadius: Radius.sm))
+                    .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
                                  color: isRetake || isNext ? Color.white : ink.borderStrong,
                                  lineWidth: isRetake ? 2 : (isNext ? 1.5 : 1))
                 }
@@ -250,21 +299,70 @@ struct CaptureView: View {
         flow.retakeIndex != nil || flow.cuts.count < flow.cutCount
     }
 
+    /* 셔터 줄 — 가운데 셔터, 왼쪽에 "나중에". 셔터는 ZStack으로 화면 정중앙에 두고, 나중에
+     * 버튼은 그 위 왼쪽에 얹는다(아이폰 카메라의 갤러리 버튼 자리) — 컷을 하나라도 찍었을 때만. */
     private var shutterRow: some View {
+        ZStack {
+            shutterButton
+            HStack {
+                resumeLaterButton
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.x5)
+        }
+        .padding(.top, Spacing.x2)
+        .padding(.bottom, Spacing.x8)
+    }
+
+    /* 셔터 — 흰 링 안의 흰 원. 카메라 앱의 문법 그대로라 설명이 필요 없다. 누를 수 없을 때는
+     * 링만 남긴다(원이 빠진다) — 흐려진 원보다 "지금은 안 된다"가 분명하다. */
+    private var shutterButton: some View {
         Button(action: onShutter) {
-            Circle()
-                .fill(.white)
-                .frame(width: 72, height: 72)
-                .overlay {
-                    Circle().stroke(.white.opacity(0.35), lineWidth: 4)
-                }
+            ZStack {
+                Circle().strokeBorder(.white, lineWidth: 3.5)
+                    .frame(width: 76, height: 76)
+                Circle().fill(.white)
+                    .frame(width: 60, height: 60)
+                    .scaleEffect(canShoot ? 1 : 0.001)
+                    .opacity(canShoot ? 1 : 0)
+            }
+            .animation(Motion.quick, value: canShoot)
         }
         .buttonStyle(.plain)
         .disabled(!canShoot)
-        .opacity(canShoot ? 1 : 0.4)
         .accessibilityLabel("촬영")
-        .padding(.top, Spacing.x2)
-        .padding(.bottom, Spacing.x8)
+    }
+
+    /* "나중에" — 지금까지 찍은 컷을 남겨 두고 촬영을 닫는다. X가 "그만두기/뒤로"라면 이쪽은
+     * "이어서 하려고 잠깐 멈춤"이다(사용자: X만 있어서 이어하기를 알 수 없다). 컷은 촬영 즉시
+     * 파일로 내려가 있으므로(§5.3), `clearMemory`가 메모리만 비우고 draft를 남긴다 — 다음에
+     * 촬영을 열면 차단 시트가 "이어서 작성"으로 받는다. 찍은 것이 없으면 남길 것도 없어 숨긴다. */
+    @ViewBuilder private var resumeLaterButton: some View {
+        if !flow.cuts.isEmpty {
+            Button {
+                /* 촬영 중에는 비우지 않는다. `capturePhoto()`는 `await`에 매달려 있고 델리게이트로만
+                 * 풀리므로, 여기서 `clearMemory`로 먼저 비우면 뒤늦게 돌아온 컷이 빈 배열에 `addCut`
+                 * 되어 cut-0.jpg와 메타가 어긋난다(리뷰). `isShooting`이 그 구간 내내 참이다. */
+                guard !isShooting else { return }
+                countdownTask?.cancel()
+                Haptics.light()
+                flow.clearMemory()
+                coordinator.isCapturePresented = false
+            } label: {
+                VStack(spacing: 3) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 20, weight: .medium))
+                    Text("나중에")
+                        .font(Typography.font(.body, .medium, size: 11))
+                }
+                .foregroundStyle(.white)
+                .frame(width: 60, height: 60)
+                .glassEffect(.regular, in: .capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("나중에 이어서 찍기")
+            .accessibilityHint("지금까지 찍은 컷을 저장하고 촬영을 닫아요")
+        }
     }
 
     // MARK: - 촬영 동작
@@ -286,6 +384,7 @@ struct CaptureView: View {
             for tick in stride(from: 3, through: 1, by: -1) {
                 if Task.isCancelled { break }
                 withAnimation { countdown = tick }
+                SoundEffects.tick(last: tick == 1)   // 카메라 앱의 타이머 소리 — 셔터는 시스템이 낸다
                 try? await Task.sleep(for: .seconds(1))
             }
             if Task.isCancelled { break }
@@ -306,6 +405,7 @@ struct CaptureView: View {
 
         do {
             flow.addCut(try await camera.capturePhoto())
+            Haptics.medium()   // 찍혔다 — 셔터음이 꺼진 기기에서 이것이 유일한 확인이다
             return true
         } catch CameraController.CaptureError.cancelled {
             // 화면을 벗어났거나 전/후면을 바꿨다 — 사용자에게 알릴 실패가 아니다.

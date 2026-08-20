@@ -1,0 +1,32 @@
+diff --git a/Cutin/CutinApp.swift b/Cutin/CutinApp.swift
+index 737e6c3..2991a8a 100644
+--- a/Cutin/CutinApp.swift
++++ b/Cutin/CutinApp.swift
+@@ -31,6 +31,13 @@ struct CutinApp: App {
+ 
+     init() {
+         KakaoLogin.initialize()
++        #if DEBUG
++        // AUDIT-HOOK (커밋 금지) — UI 감사용 세션 주입
++        if let token = ProcessInfo.processInfo.environment["AUDIT_TOKEN"], !token.isEmpty {
++            TokenStore().save(AuthTokens(accessToken: token, refreshToken: "audit",
++                                         expiresAt: Date().addingTimeInterval(11 * 3600)))
++        }
++        #endif
+         /* 세션과 카탈로그가 **같은 전송 계층**을 쓴다. 따로 만들면 카탈로그 쪽 클라이언트에는
+          * 액세스 토큰도 재발급 경로도 없어서 `/templates`(auth 필요)가 401로 끝난다. */
+         let client = APIClient()
+diff --git a/Cutin/RootView.swift b/Cutin/RootView.swift
+index 9f43ffe..70d2c85 100644
+--- a/Cutin/RootView.swift
++++ b/Cutin/RootView.swift
+@@ -75,6 +75,9 @@ struct RootView: View {
+          * 셸이 뜰 때마다 다시 등록한다 — `PushRegistrar.registerIfAuthorized`가 이 호출
+          * 하나로 배선된다(권한이 없으면 아무 일도 하지 않는다). */
+         .task { await push.registerIfAuthorized() }
++        #if DEBUG
++        .task { await AuditHook.apply(coordinator: coordinator, flow: flow, catalog: catalog) } // AUDIT-HOOK
++        #endif
+         .onChange(of: scenePhase) { _, phase in
+             if phase == .active {
+                 /* 만료는 읽는 시점 판정이지만(§5.3) 이 객체는 앱 수명이라 시작 시 한 번만으로는

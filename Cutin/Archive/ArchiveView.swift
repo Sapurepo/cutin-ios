@@ -24,6 +24,7 @@ struct ArchiveView: View {
         )
         .background(palette.bg)
         .navigationTitle(AppTab.archive.title)
+        .navigationBarTitleDisplayMode(.inline)
         .routeDestinations()
         /* 탭에 들어올 때마다 확인한다. 보관은 상세 화면에서 바뀌므로, 한 번만 받으면
          * 방금 보관한 포스트가 여기 없다(`toggleBookmark`가 `hasLoaded`를 내려 둔다). */

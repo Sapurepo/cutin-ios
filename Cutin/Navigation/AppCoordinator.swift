@@ -4,6 +4,7 @@
  * 촬영은 탭 전환이 아니라 "어느 탭에서든 열리는 모달 플로우"라 탭 트리 안에 두면
  * 중앙 CTA·draft 차단(§5.3)·저장 후 피드 복귀가 모두 뷰 안에 묶인다. */
 
+import Foundation
 import Observation
 
 /// 촬영 시트 내부의 단계. 시트 밖 탭 화면의 라우팅과 섞이지 않게 분리해 둔다.
@@ -22,6 +23,28 @@ final class AppCoordinator {
     private(set) var tab: AppTab = .home
     var isCapturePresented = false
     var capturePath: [CaptureStep] = []
+
+    /* 포스트 미리보기(길게 누르기 → 팝업). 탭 트리 **위**에 그려야 탭바·내비게이션 바까지 스크림이
+     * 덮이므로 셸이 소유한다 — 프로필 그리드가 요청하고 `RootView`가 그린다. */
+    var peekPostId: UUID?
+
+    /* 탭 넷의 네비게이션 경로. 화면 밖(미리보기 팝업)에서 상세를 밀어 넣으려면 "지금 보고 있는
+     * 스택"에 손이 닿아야 한다 — NavigationLink는 자기 스택 안에서만 통한다. */
+    var homePath: [Route] = []
+    var friendsPath: [Route] = []
+    var profilePath: [Route] = []
+    var archivePath: [Route] = []
+
+    /// 지금 보고 있는 탭의 스택에 밀어 넣는다. 촬영 탭은 스택이 없다 — 홈으로 보낸다.
+    func push(_ route: Route) {
+        switch tab {
+        case .home: homePath.append(route)
+        case .friends: friendsPath.append(route)
+        case .profile: profilePath.append(route)
+        case .archive: archivePath.append(route)
+        case .capture: tab = .home; homePath.append(route)
+        }
+    }
 
     /// 액션 탭(중앙 CTA)은 선택값으로 삼지 않는다 — 탭은 그대로 두고 시트만 연다.
     ///

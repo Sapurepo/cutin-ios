@@ -32,7 +32,8 @@ struct FinishStepView: View {
             Spacer(minLength: 0)
 
             Button(action: save) {
-                Text(publisher.step.label ?? "저장").primaryGlassLabel()
+                // "저장"이 아니라 "올리기" — 이 버튼은 서버에 발행한다(0.4.0 감사).
+                Text(publisher.step.label ?? "올리기").primaryGlassLabel()
             }
             .primaryGlassButton(tint: palette.accent)
             .disabled(publisher.isPublishing || flow.cuts.isEmpty)
@@ -41,8 +42,7 @@ struct FinishStepView: View {
         .padding(.top, Spacing.x4)
         .padding(.bottom, Spacing.x6)
         .background(palette.bg)
-        .navigationTitle("마무리")
-        .navigationBarTitleDisplayMode(.inline)
+        .editStepTitle("마무리", step: 3)
         .toolbar {
             /* 캡션은 여러 줄이라 Return이 줄바꿈이다. 키보드를 접을 길이 없으면 사용자는
              * 미리보기도 실패 문구도 보지 못한 채로 남는다. */
@@ -56,7 +56,7 @@ struct FinishStepView: View {
     private var captionField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("캡션")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             TextField("한 줄 남기기", text: $flow.caption, axis: .vertical)
                 .font(Typography.bodyText)
@@ -71,23 +71,30 @@ struct FinishStepView: View {
     /* 대표 컷(§6.3). **안 골라도 된다** — 미지정이면 서버가 첫 컷을 기본으로 쓴다.
      * 직접 고른 것과 기본의 구분이 실제 동작을 가른다: 고른 포스트만 프로필 그리드 맨 앞에
      * 고정된다(0.3.0 제품 결정). 그래서 기본 선택을 채워 두지 않고, 고른 것을 다시 누르면
-     * 해제된다 — 고정을 무르는 길이 있어야 한다. */
+     * 해제된다 — 고정을 무르는 길이 있어야 한다.
+     *
+     * 고정은 발행 요청의 `pinned`로 따로 실린다(cutin-backend#14) — 첫 컷을 골라도 고정이다.
+     * (그 전 서버에서는 첫 컷 지정이 미지정과 같아 고정되지 않았다. 문구와 배지는 같은 규칙에서 낸다.) */
     private var thumbnailField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("대표 컷")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             HStack(spacing: Spacing.x2) {
                 ForEach(Array(flow.cuts.enumerated()), id: \.offset) { index, cut in
                     thumbnailChoice(index: index, cut: cut)
                 }
             }
-            Text(flow.thumbnailCutIndex == nil
-                 ? "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
-                 : "이 포스트가 프로필 맨 위에 고정돼요")
+            Text(thumbnailHint)
                 .font(Typography.caption)
                 .foregroundStyle(palette.textSecondary)
         }
+    }
+
+    private var thumbnailHint: String {
+        flow.thumbnailCutIndex == nil
+            ? "고르면 프로필 맨 위에 고정돼요. 안 고르면 첫 컷이 대표예요"
+            : "이 포스트가 프로필 맨 위에 고정돼요"
     }
 
     private func thumbnailChoice(index: Int, cut: UIImage) -> some View {
@@ -101,13 +108,14 @@ struct FinishStepView: View {
                 .frame(width: 52, height: 52)
                 .clipShape(.rect(cornerRadius: Radius.sm))
                 .tokenBorder(RoundedRectangle(cornerRadius: Radius.sm),
-                             color: selected ? palette.accent : palette.border,
+                             color: selected ? palette.brand : palette.border,
                              lineWidth: selected ? 2 : 1)
                 .overlay(alignment: .topTrailing) {
+                    // 고른 컷에 핀 — 어느 컷이든 고르면 고정이다(발행 요청의 `pinned`).
                     if selected {
                         Image(systemName: "pin.circle.fill")
                             .font(.system(size: 15))
-                            .foregroundStyle(palette.accent)
+                            .foregroundStyle(palette.brand)
                             .background(palette.bg, in: .circle)
                             .offset(x: 4, y: -4)
                     }
@@ -119,7 +127,7 @@ struct FinishStepView: View {
     private var visibilityField: some View {
         VStack(alignment: .leading, spacing: Spacing.x2) {
             Text("공개 범위")
-                .font(Typography.caption)
+                .font(Typography.label)
                 .foregroundStyle(palette.textSecondary)
             HStack(spacing: Spacing.x2) {
                 ForEach(PostVisibility.allCases, id: \.self) { option in
@@ -155,7 +163,11 @@ struct FinishStepView: View {
     private func save() {
         isCaptionFocused = false
         Task {
-            if await flow.commit(with: publisher, to: store) { onSaved() }
+            if await flow.commit(with: publisher, to: store) {
+                Haptics.success()   // 올라갔다 — 화면이 바로 닫히므로 손끝이 알려 준다
+                SoundEffects.success()
+                onSaved()
+            }
         }
     }
 }

@@ -16,20 +16,42 @@ struct AuthGate: View {
      * 도움말이 재설치 후 한 번 더 뜨는 것은 사고가 아니다. 재열람은 프로필의 도움말 메뉴다. */
     @AppStorage("tips.seen") private var hasSeenTips = false
 
+    /* 인트로가 끝났는지. 인트로는 **고정 길이**다 — `restore()`가 먼저 끝나도 연출은 끝까지 가고,
+     * 늦게 끝나도 인트로가 기다려 주지 않는다(서버가 1초 넘게 걸리면 그 뒤로 빈 배경이 잠깐 —
+     * `IntroView` 머리말의 "최대 1초"). 앱 수명 동안 한 번만 false다. */
+    @State private var isIntroDone = false
+
     var body: some View {
-        content
-            /* 앱을 켤 때 한 번. `.task`는 뷰가 사라지면 취소되는데 이 뷰는 앱 수명 동안
-             * 살아 있으므로 취소 걱정이 없다. */
-            .task { await session.restore() }
+        ZStack {
+            content
+            if !isIntroDone {
+                IntroView { isIntroDone = true }
+                    .environment(\.palette, Palette.of(colorScheme))
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .animation(Motion.standard, value: isIntroDone)
+        /* 앱을 켤 때 한 번. `.task`는 뷰가 사라지면 취소되는데 이 뷰는 앱 수명 동안
+         * 살아 있으므로 취소 걱정이 없다. */
+        .task { await session.restore() }
     }
 
+    /* 인트로가 덮고 있는 동안 아래에 무엇을 둘지는 화면마다 다르다.
+     *
+     * 탭 셸(`RootView`)은 **미리** 둔다 — 덮개 뒤에서 피드·카탈로그를 받아 두면 인트로가 걷힐 때
+     * 이미 채워져 있다. 로그인·온보딩·팁은 인트로가 끝난 **뒤에** 둔다 — 로그인의 스트립 등장
+     * 연출과 온보딩의 자동 포커스(키보드)가 덮개 뒤에서 아무도 못 보는 채 지나가 버린다.
+     * 그래서 이 셋은 인트로가 걷히는 순간 나타나 자기 연출을 시작한다. */
     @ViewBuilder
     private var content: some View {
         switch session.phase {
         case .restoring:
-            /* 스플래시를 따로 그리지 않는다. Keychain 읽기는 즉시 끝나고 `/users/me` 왕복만
-             * 남으므로 대개 한 프레임이다 — 로고를 띄우면 오히려 번쩍인다. */
-            Color(Palette.of(colorScheme).bg).ignoresSafeArea()
+            /* 인트로가 위를 덮고 있다(`IntroView` 머리말). 인트로가 끝난 뒤에도 복원이 안 끝났으면
+             * 빈 배경이 잠깐 보인다 — 서버가 1초 넘게 걸리는 경우뿐이다. */
+            blank
+        case _ where !isIntroDone && !isShell:
+            blank
         case .signedOut:
             LoginView()
                 .environment(\.palette, Palette.of(colorScheme))
@@ -47,5 +69,17 @@ struct AuthGate: View {
         case .signedIn:
             RootView()
         }
+    }
+
+    private var blank: some View {
+        Color(Palette.of(colorScheme).bg).ignoresSafeArea()
+    }
+
+    /// 로그인 + 온보딩 완료 + 팁 봄 — 탭 셸이 뜨는 조건과 같다.
+    private var isShell: Bool {
+        if case .signedIn(let profile) = session.phase {
+            return profile.onboardingCompleted && hasSeenTips
+        }
+        return false
     }
 }
