@@ -11,7 +11,7 @@
 import base64, hashlib, hmac, json, os, subprocess, sys, time, uuid, urllib.request, urllib.error
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-API = os.environ.get("CUTIN_API", "http://localhost:3000")
+API = os.environ.get("CUTIN_API", "http://localhost:8000")
 BACKEND = os.path.expanduser(os.environ.get("CUTIN_BACKEND", "~/orca/workspaces/cutin-backend/dev"))
 SECRET = [l.split("=", 1)[1].strip() for l in open(f"{BACKEND}/.env") if l.startswith("JWT_SECRET=")][0]
 ME = os.environ.get("CUTIN_ME") or sys.exit("CUTIN_ME(내 user id)가 필요합니다 — psql: select id, nickname from users")

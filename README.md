@@ -62,7 +62,7 @@ MVP 1차. 착수 시점에 백엔드(`cutin-backend`)가 커밋 하나뿐이었�
 **서버는 아직 배포되지 않았습니다.** 저장소에 운영 주소가 없고 배포 설정 자체가 없습니다
 (`docker-compose`는 로컬용, CI만 존재 · `PUBLIC_BASE_URL` 기본값이 `localhost` · 스토리지는
 로컬 디스크 · `CLAUDE.md`에 "인프라 미정"). 그래서 `Config/Debug.xcconfig`는
-`http://localhost:3000`을, `Release.xcconfig`는 **빈 값**을 가리킵니다 — Release는 첫 API
+`http://localhost:8000`을, `Release.xcconfig`는 **빈 값**을 가리킵니다 — Release는 첫 API
 호출에서 크래시합니다(조용히 잘못된 주소로 붙는 것보다 낫습니다). 배포되면 한 줄만 채우면 됩니다.
 
 **합성은 클라이언트 몫입니다.** 서버 `postSchema`의 `composed` 필드에 "iOS가 만든 합성본"이라고

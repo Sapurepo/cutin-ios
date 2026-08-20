@@ -24,7 +24,7 @@
 ```bash
 # 0. 로컬 서버 (백엔드 워크트리에서) — Postgres는 docker compose
 cd ~/orca/workspaces/cutin-backend/dev && docker compose up -d postgres && pnpm db:migrate && pnpm dev &
-#    .env의 PUBLIC_BASE_URL이 http://localhost:3000 이어야 시뮬레이터가 이미지를 받는다
+#    .env의 PUBLIC_BASE_URL이 http://localhost:8000 이어야 시뮬레이터가 이미지를 받는다
 
 # 1. 시드 — '나'는 실제 로그인한 적 있는 사용자 id
 CUTIN_ME=<user id> python3 Scripts/audit/seed/seed.py        # → seed/me.token, seed/out/
@@ -36,7 +36,7 @@ cp Scripts/audit/AuditHook.swift Cutin/AuditHook.swift
 # 3. 빌드 — base URL은 파일을 건드리지 않고 인자로 넘긴다
 DEV=F4A70383-9134-477E-BCCA-B7824317EDE0
 xcodebuild -scheme Cutin -destination "platform=iOS Simulator,id=$DEV" \
-  -derivedDataPath /tmp/dd-audit CUTIN_API_BASE_URL='http://localhost:3000' build
+  -derivedDataPath /tmp/dd-audit CUTIN_API_BASE_URL='http://localhost:8000' build
 xcrun simctl install $DEV /tmp/dd-audit/Build/Products/Debug-iphonesimulator/Cutin.app
 
 # 4. 시뮬레이터 한 번만: 한국어 로케일 · 카메라 권한(TCC) · 팁 본 것으로
