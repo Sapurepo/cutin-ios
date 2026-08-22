@@ -5,6 +5,7 @@
 
 - 기준선: [감사 2026-08-17](audit-2026-08-17.md) · 콘택트 시트 [라이트](audit-2026-08-17-light.jpg) / [다크](audit-2026-08-17-dark.jpg)
 - **after**(같은 시드·같은 절차, 0.4.0 개편 뒤): [라이트](audit-2026-08-17-after-light.jpg) / [다크](audit-2026-08-17-after-dark.jpg)
+- **현재**(0.4.0 이후 고정·미리보기·효과음까지 반영, 2026-08-22): [라이트](preview-2026-08-22-light.jpg) / [다크](preview-2026-08-22-dark.jpg) — 루트 README가 쓰는 시트
 - 다시 찍는 법: `Scripts/audit/README.md`
 
 ## 원칙 셋

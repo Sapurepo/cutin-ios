@@ -22,7 +22,7 @@
 기능 명세 전문은 [CUTIN-FEATURES.md](./CUTIN-FEATURES.md)를 참고하세요.
 
 <div align="center">
-<img src="./Design/audit-2026-08-17-light.jpg" alt="CUTIN 화면 미리보기 (라이트)" width="100%">
+<img src="./Design/preview-2026-08-22-light.jpg" alt="CUTIN 화면 미리보기 (라이트)" width="100%">
 </div>
 
 ## 주요 기능
