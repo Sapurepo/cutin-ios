@@ -249,6 +249,23 @@ final class PostStore {
         return url
     }
 
+    /* 친구 관계가 바뀌었다 — `SocialStore`가 부른다(잇는 자리는 `CutinApp.init`).
+     *
+     * 친구공개 포스트의 노출이 **친구 관계에만** 달려 있다. 서버 `visibleToViewer`는
+     * `friendships`만 보고 `follows`는 보지 않으므로, 맞팔이 성립하는 순간 상대의 친구공개 글이
+     * 피드에 새로 들어오고 끊기면 빠진다. 서버가 즉시 반영해도 앱이 받아 둔 목록은 옛 범위 그대로다
+     * (cutin-backend#17이 "클라이언트가 팔로우 응답 후 피드를 다시 부르는지" 확인을 남긴 자리).
+     *
+     * 피드는 비우기만 한다 — 팔로우는 친구 탭에서 누르고 피드는 다른 탭이라 "다음에 열 때"가
+     * 성립한다(`toggleBookmark`와 같은 판단). 반면 **그 사람의 그리드는 지금 떠 있는 화면**이라
+     * (`UserProfileView`에서 팔로우한다) 비워 두면 채울 계기가 없어 빈 채로 남는다 — 여기서 받는다.
+     * 받아 둔 적이 없으면 그냥 둔다. 열 때 `.task`가 처음부터 받는다. */
+    func friendshipChanged(with userId: UUID) async {
+        feed.invalidate()
+        guard userLists[userId] != nil else { return }
+        await loadUser(id: userId, refresh: true)
+    }
+
     // MARK: - 내부
 
     private func merge(_ items: [Post]) {
