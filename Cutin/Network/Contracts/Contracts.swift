@@ -325,9 +325,11 @@ struct PatchPostBody: Encodable, Sendable {
     /// `.null`을 보내면 프레임을 지운다 — 그 포스트의 `frame`이 null로 내려온다.
     var frameId: Field<UUID>?
     var caption: Field<String>?
+    /// 발행 뒤에도 바꿀 수 있다(cutin-backend#17) — 바꾸는 즉시 남의 피드·상세·보관 목록이 따라온다.
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Field<Int>?
-    /// 프로필 맨 앞 고정. 발행 뒤에도 이 필드(와 대표 컷)만은 PATCH할 수 있다(cutin-backend#14).
+    /// 프로필 맨 앞 고정. 발행 뒤에 바꿀 수 있는 셋 중 하나다 — 나머지는 대표 컷과 공개 범위
+    /// (cutin-backend#14, #17). 다른 필드가 섞이면 서버가 `POST_NOT_DRAFT`로 거절한다.
     var pinned: Bool?
     var cuts: [CutInput]?
 }

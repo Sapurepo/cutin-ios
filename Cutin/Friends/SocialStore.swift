@@ -49,6 +49,11 @@ final class SocialStore {
 
     @ObservationIgnored private let client: APIClient
 
+    /* 친구공개 포스트의 노출이 달라졌을 때 할 일. 관계는 여기가 갖고 그 노출은 `PostStore`가
+     * 그리므로 둘을 이어야 하는데, 스토어가 서로를 직접 알지 않도록 클로저로 받는다 —
+     * `AuthSession.onAccountChange`와 같은 방향이다. 앱이 심는다(`CutinApp.init`). */
+    @ObservationIgnored var onFriendshipChange: (@MainActor (UUID) async -> Void)?
+
     init(client: APIClient) {
         self.client = client
     }
@@ -127,8 +132,10 @@ final class SocialStore {
         await load(\.searchResults, path: "/users/search", query: ["q": trimmed], refresh: false)
     }
 
-    func loadRecommended() async {
-        guard !isLoadingRecommended, recommended.isEmpty else { return }
+    /* `refresh`는 관계를 바꾼 뒤에 쓴다(`relationChanged`). 기본값이 "한 번 받았으면 넘어간다"인
+     * 이유는 화면이 뜰 때마다 부르기 때문이다 — 그 자리에서 매번 받으면 탭을 오갈 때마다 왕복이 는다. */
+    func loadRecommended(refresh: Bool = false) async {
+        guard !isLoadingRecommended, refresh || recommended.isEmpty else { return }
         isLoadingRecommended = true
         let generation = generation
         defer { isLoadingRecommended = false }
@@ -174,6 +181,9 @@ final class SocialStore {
      * 엉뚱하게 나중에 검색 결과 자리에 옛 문구가 뜬다. */
     func toggleFollow(id: UUID) async throws {
         guard let profile = profiles[id] else { return }
+        /* 바꾸기 **전** 값을 들고 있어야 한다 — 아래에서 `profiles[id]`가 갈리고 나면
+         * 친구 관계가 이번에 생겼는지 끊겼는지를 알 길이 없다(`relationChanged`가 그것으로 가른다). */
+        let wasFriend = profile.friend
         if profile.following {
             try await client.send(.delete, "/users/\(id.path)/follow")
             await loadProfile(id: id)
@@ -187,6 +197,22 @@ final class SocialStore {
         // 친구 목록이 달라졌다. 커서 목록이라 직접 고치지 않고 다시 받는다.
         friends.invalidate()
         followees.invalidate()
+        await relationChanged(with: id, wasFriend: wasFriend)
+    }
+
+    /* 관계를 바꾼 뒤의 뒷정리. 추천과 피드가 **서로 다른 조건**에 반응해서 함께 두었다.
+     *
+     * 추천은 팔로우한 사람과 친구를 **모두** 제외하므로(서버 `recommend`의 `not exists (… follows …)`)
+     * 맞팔이든 단방향이든 구성이 바뀐다 — 늘 다시 받는다. 비우기만 하지 않는 이유는 `FriendsView`가
+     * 팔로우를 누르는 화면(`UserProfileView`)의 **부모**라 되돌아와도 `.task`가 다시 돌지 않기 때문이다.
+     *
+     * 피드는 친구 관계가 **실제로** 바뀌었을 때만 알린다. 친구공개 글의 노출은 `friendships`에만
+     * 달려 있어(`PostStore.friendshipChanged`) 단방향 팔로우로는 아무것도 달라지지 않는데,
+     * 그때도 알리면 피드가 멀쩡한 목록을 버리고 처음부터 다시 받는다. */
+    private func relationChanged(with id: UUID, wasFriend: Bool) async {
+        await loadRecommended(refresh: true)
+        guard (profiles[id]?.friend ?? false) != wasFriend else { return }
+        await onFriendshipChange?(id)
     }
 
     /// 차단·해제. 둘 다 본문 없이 204다.
@@ -206,6 +232,11 @@ final class SocialStore {
         friends.invalidate()
         followees.invalidate()
         followers.invalidate()
+        /* 차단은 친구 관계와 **별개로** 노출을 가른다 — 서버 `visibleToViewer`가 `blocks`를 직접
+         * 보므로 차단하면 그 사람 글이 공개 범위와 무관하게 전부 빠지고, 해제하면 범위에 따라
+         * 돌아온다. 친구였는지를 따지지 않고 늘 알리는 이유다(`relationChanged`를 거치지 않는다). */
+        await loadRecommended(refresh: true)
+        await onFriendshipChange?(id)
     }
 
     // MARK: - 신고 (§1-7)

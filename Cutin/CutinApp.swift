@@ -56,6 +56,14 @@ struct CutinApp: App {
             notifications.reset()
         }
 
+        /* 친구 관계가 바뀌면 친구공개 포스트의 노출이 달라진다. 서버는 즉시 반영하지만
+         * (cutin-backend#17) 앱이 받아 둔 피드는 옛 범위 그대로라 맞팔한 친구의 글이 들어오지
+         * 않는다. 관계는 `SocialStore`가, 그 노출은 `PostStore`가 갖고 있어 둘을 이어야 하는데,
+         * 스토어끼리 서로를 알게 하지 않고 위 `onAccountChange`와 같은 자리에서 잇는다. */
+        social.onFriendshipChange = { userId in
+            await store.friendshipChanged(with: userId)
+        }
+
         self.session = session
         self.store = store
         self.social = social

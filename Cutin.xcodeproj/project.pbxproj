@@ -20,7 +20,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		C0710300000000000000A005 /* Cutin */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Cutin; sourceTree = "<group>"; };
+		C0710300000000000000A005 /* Cutin */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Cutin;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,10 +120,10 @@
 			);
 			mainGroup = C0710300000000000000A002;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			packageReferences = (
 				C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 			);
+			preferredProjectObjectVersion = 77;
 			productRefGroup = C0710300000000000000A003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -221,6 +225,27 @@
 		};
 /* End XCBuildConfiguration section */
 
+/* Begin XCConfigurationList section */
+		C0710300000000000000B001 /* Build configuration list for PBXProject "Cutin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0710300000000000000B002 /* Debug */,
+				C0710300000000000000B003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0710300000000000000B004 /* Build configuration list for PBXNativeTarget "Cutin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0710300000000000000B005 /* Debug */,
+				C0710300000000000000B006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		C0710300000000000000D001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -249,27 +274,6 @@
 			productName = KakaoSDKUser;
 		};
 /* End XCSwiftPackageProductDependency section */
-
-/* Begin XCConfigurationList section */
-		C0710300000000000000B001 /* Build configuration list for PBXProject "Cutin" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				C0710300000000000000B002 /* Debug */,
-				C0710300000000000000B003 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		C0710300000000000000B004 /* Build configuration list for PBXNativeTarget "Cutin" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				C0710300000000000000B005 /* Debug */,
-				C0710300000000000000B006 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-/* End XCConfigurationList section */
 	};
 	rootObject = C0710300000000000000A001 /* Project object */;
 }
