@@ -104,6 +104,17 @@ struct PostDetailView: View {
                     Divider()
                     // 남의 포스트는 지울 수 없다 — 서버가 404를 내므로 버튼을 두면 거짓 약속이다.
                     if post.author.id == session.userId {
+                        /* 공개 범위도 내 것만 바꿀 수 있다(같은 404). **발행 뒤에도 열려 있다**
+                         * (cutin-backend#17) — 올린 뒤 마음이 바뀌는 것을 되돌릴 수 없으면 안 된다.
+                         *
+                         * `Picker`는 메뉴 안에서 하위 메뉴가 되고 **지금 값에 체크가 붙는다.**
+                         * 버튼 셋을 늘어놓으면 무엇이 켜져 있는지 보이지 않아, 바꾸러 온 사람이
+                         * 지금 상태를 모른 채 고르게 된다. */
+                        Picker("공개 범위", selection: visibility(of: post)) {
+                            ForEach(PostVisibility.allCases, id: \.self) { option in
+                                Text(option.label).tag(option)
+                            }
+                        }
                         Button("삭제", role: .destructive) { delete(post) }
                     } else {
                         Button("신고하기") { isReporting = true }
@@ -210,6 +221,32 @@ struct PostDetailView: View {
             try await store.react(id: post.id, type: type)
         } catch {
             notice = error.displayMessage(fallback: "반응을 남기지 못했어요")
+        }
+    }
+
+    /* 메뉴 `Picker`가 쓸 바인딩. 포스트는 사전에서 꺼낸 **사본**이라 쓰기가 대입이 아니라
+     * 서버 왕복이다 — 고른 값을 보내고 응답이 사전을 갱신하면 화면이 따라온다. 낙관적으로 먼저
+     * 바꾸지 않는 이유는 이 화면의 다른 토글과 같다(거절당하면 화면만 앞서 나간다).
+     *
+     * 서버가 모르는 값을 보내 왔으면(`known`이 nil — `ServerEnum` 머리말) 가장 좁은 `friends`로
+     * 읽는다. 셋 중 무엇에도 체크가 없는 메뉴보다 낫고, 그 상태에서 고르면 아는 값으로 덮인다. */
+    private func visibility(of post: Post) -> Binding<PostVisibility> {
+        Binding(
+            get: { post.visibility.known ?? .friends },
+            set: { option in Task { await setVisibility(post, option) } }
+        )
+    }
+
+    /* 같은 값을 다시 고르면 아무것도 하지 않는다. `Picker`는 **이미 켜진 항목을 눌러도** `set`을
+     * 부르므로, 거르지 않으면 메뉴를 열었다 닫을 때마다 왕복이 하나씩 는다. */
+    private func setVisibility(_ post: Post, _ option: PostVisibility) async {
+        guard option != post.visibility.known else { return }
+        notice = nil
+        Haptics.light()
+        do {
+            try await store.setVisibility(id: post.id, option)
+        } catch {
+            notice = error.displayMessage(fallback: "공개 범위를 바꾸지 못했어요")
         }
     }
 

@@ -198,8 +198,9 @@ final class PostStore {
         posts[id] = post.replacing(reactions: summary)
     }
 
-    /* 고정 켜기/끄기(§6.3) — `PATCH { pinned }`. 발행된 포스트의 PATCH는 서버가 이 필드(와 대표 컷)만
-     * 허용한다(cutin-backend#14) — 그 전 서버는 `POST_NOT_DRAFT`를 내고, 부른 화면이 문구로 알린다.
+    /* 고정 켜기/끄기(§6.3) — `PATCH { pinned }`. 발행된 포스트의 PATCH는 서버가 이 필드와
+     * 대표 컷·공개 범위만 허용한다(cutin-backend#14, #17) — 그 전 서버는 `POST_NOT_DRAFT`를 내고,
+     * 부른 화면이 문구로 알린다.
      *
      * 고정을 바꾸면 **그 사람 프로필 목록의 순서 자체가 바뀐다** — 서버가 고정을 맨 앞에 두고
      * 커서가 `(pinned, publishedAt)` 복합키가 됐다(cutin-backend#15). 그래서 사전만 갱신하고 말면
@@ -215,6 +216,20 @@ final class PostStore {
         let updated = try await client.send(.patch, "/posts/\(id.path)", body: body, as: Post.self)
         merge([updated])
         await loadUser(id: updated.author.id, refresh: true)
+    }
+
+    /* 공개 범위 바꾸기(§6.3) — `PATCH { visibility }`. **발행 뒤에도 바꿀 수 있다**
+     * (cutin-backend#17). 서버의 노출 판정이 조회 시점의 `posts.visibility`만 보므로
+     * 바꾸는 즉시 남의 피드·상세·보관 목록이 따라오고, `private`으로 좁히면 공유 링크도 막힌다.
+     *
+     * `setPinned`와 달리 목록을 다시 받지 않는다. 달라지는 것은 **남이 보는 범위**이고
+     * 내 글은 공개 범위와 무관하게 내 피드와 내 그리드에 늘 있다(서버 `visibleToViewer`의
+     * 첫 줄이 `authorId = viewerId`다). 순서도 그대로다 — 사전만 갱신하면 화면의 사본이 따라온다. */
+    func setVisibility(id: UUID, _ visibility: PostVisibility) async throws {
+        var body = PatchPostBody()
+        body.visibility = ServerEnum(visibility)
+        let updated = try await client.send(.patch, "/posts/\(id.path)", body: body, as: Post.self)
+        merge([updated])
     }
 
     /// 삭제. 서버가 soft delete라 목록에서도 빠진다.
