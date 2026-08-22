@@ -65,3 +65,11 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# UI 감사(Scripts/audit) 산출물 — 다시 찍으면 재생성된다.
+# me.token은 서버 비밀로 서명한 **액세스 토큰**이라 특히 저장소에 남기지 않는다.
+Scripts/audit/seed/out/
+Scripts/audit/seed/src/
+Scripts/audit/seed/me.token
+Scripts/audit/seed/spec.json
+Design/shots/

@@ -22,7 +22,7 @@
 See [CUTIN-FEATURES.md](./CUTIN-FEATURES.md) for the full feature specification (Korean).
 
 <div align="center">
-<img src="./Design/audit-2026-08-17-light.jpg" alt="CUTIN screen preview (light)" width="100%">
+<img src="./Design/preview-2026-08-22-light.jpg" alt="CUTIN screen preview (light)" width="100%">
 </div>
 
 ## Features

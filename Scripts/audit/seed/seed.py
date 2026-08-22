@@ -182,7 +182,7 @@ for pid, owner, tcode, fcode, srcs, offs, caption, vis, thumb in POSTS:
     tid = templates[tcode][0]
     fid = frames[fcode][0]
     # 이미 있는지 — 캡션 대신 시드 마커를 comments? 단순히 카운트로 판단: 소유자의 published 포스트 중 같은 템플릿·프레임·캡션
-    existing = psql(f"select id from posts where author_id='{ids[owner]}' and template_id='{tid}' and coalesce(caption,'')='{(caption or '').replace(chr(39), chr(39)*2)}' and published_at is not null limit 1")
+    existing = psql(f"select id from posts where author_id='{ids[owner]}' and template_id='{tid}' and coalesce(caption,'')='{(caption or '').replace(chr(39), chr(39)*2)}' and published_at is not null and deleted_at is null limit 1")
     if existing:
         post_ids[pid] = existing
         continue
