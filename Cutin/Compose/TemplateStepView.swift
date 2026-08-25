@@ -50,9 +50,23 @@ struct TemplateStepView: View {
 
             chips(title: "프레임") {
                 ForEach(catalog.frames, id: \.id) { item in
-                    CutinChip(label: item.name, selected: item.id == flow.frame?.id) {
+                    let selected = item.id == flow.frame?.id
+                    // 이름 앞에 프레임 견본 — 배치 칩과 같은 이유다(§`FrameSwatch`).
+                    Button {
                         flow.frame = item
+                    } label: {
+                        HStack(spacing: Spacing.x2) {
+                            FrameSwatch(frame: item, selected: selected)
+                            Text(item.name)
+                                .font(selected ? Typography.font(.body, .semibold, size: 12) : Typography.chip)
+                                .foregroundStyle(selected ? palette.brandInk : palette.textPrimary)
+                        }
+                        .padding(.horizontal, Spacing.x3)
+                        .padding(.vertical, Spacing.x2)
+                        .background(selected ? palette.brandSoft : palette.surface, in: .capsule)
+                        .tokenBorder(Capsule(), color: selected ? palette.brand : palette.border)
                     }
+                    .buttonStyle(.plain)
                 }
             }
 

@@ -329,7 +329,7 @@ private extension Post {
             id: id, author: author, template: template, frame: frame,
             status: status, visibility: visibility, caption: caption,
             thumbnailCutIndex: thumbnailCutIndex, pinned: pinned, cuts: cuts, composed: composed,
-            publishedAt: publishedAt, createdAt: createdAt,
+            motion: motion, publishedAt: publishedAt, createdAt: createdAt,
             commentCount: commentCount,
             reactions: reactions ?? self.reactions,
             bookmarked: bookmarked ?? self.bookmarked

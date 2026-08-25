@@ -23,13 +23,15 @@ struct ComposePreview: View {
     var body: some View {
         ZStack {
             if let image {
+                /* 합성본은 **각지게** 보여준다. 프레임 여백이 얇으면 둥근 모서리가 코너에서
+                 * 테두리를 먹고 사진까지 깎는데(포토부스 스트립에서 특히 심했다), 무엇보다
+                 * 파일로 남는 그림 자체가 사각형이다 — 화면만 둥글면 고를 때 본 것과 달라진다. */
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(.rect(cornerRadius: Radius.md))
             } else {
                 // 로드 전 레이아웃이 튀지 않게 정사각으로 자리를 잡는다 (템플릿 대부분이 1:1).
-                RoundedRectangle(cornerRadius: Radius.md)
+                Rectangle()
                     .fill(palette.surfaceSunken)
                     .aspectRatio(1, contentMode: .fit)
             }
@@ -55,14 +57,19 @@ struct ComposePreview: View {
 
     private func render() async {
         guard !flow.cuts.isEmpty else { return }
-        // 템플릿·프레임이 없으면 그릴 배치가 없다. 자리만 잡아 둔 사각형이 그대로 남는다.
-        guard let request = flow.compositionRequest(outputWidth: Self.width) else { return }
 
         /* 칩을 빠르게 훑으면 선택마다 렌더가 시작된다. `Task.detached`는 취소를 물려받지 않으니
          * 한 번 시작한 합성은 끝까지 간다 — 컷마다 12MP를 축소하는 일이 겹쳐 쌓인다.
          * `Task.sleep`은 취소되므로, 여기서 걸러 마지막 선택만 굽는다. */
         try? await Task.sleep(for: .milliseconds(80))
         guard !Task.isCancelled else { return }
+
+        // 장식은 그림이라 합성 전에 받아 둬야 한다. 프레임을 바꾸면 renderKey가 달라져 여기로 다시 온다.
+        await flow.loadDecor()
+        guard !Task.isCancelled else { return }
+
+        // 템플릿·프레임이 없으면 그릴 배치가 없다. 자리만 잡아 둔 사각형이 그대로 남는다.
+        guard let request = flow.compositionRequest(outputWidth: Self.width) else { return }
 
         isRendering = true
 

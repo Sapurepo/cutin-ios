@@ -19,6 +19,8 @@ struct CompositionRequest: Sendable {
     /// 외형. 서버가 소유하되 **null일 수 있어**(`Post.frame`) 여기서는 이미 해소된 값을 받는다.
     var frame: Frame
     var filter: FilterID = .original
+    /// 프레임 장식(그림). 합성기는 동기라 받아 둔 것을 실어 넘긴다 — `FrameDecorLoader`.
+    var decor: FrameDecor = .none
     /// 프레임 푸터 날짜 스탬프 — 프레임에 footer가 있을 때만 표시
     var stampDate: Date?
     /// 결과물 가로 픽셀. 프리뷰는 작게, 저장은 크게 부른다.
@@ -33,6 +35,12 @@ enum CutCompositor {
     /// 파일로 남기는 합성 폭. 화면용은 이보다 작게 굽는다(`ComposePreview`).
     static let saveWidth: CGFloat = 1080
 
+    /* 장식 밴드가 차지하는 높이 — 캔버스 폭 대비 비율이다. 폭 1080 기준 190px·150px로,
+     * `Scripts/frames/renderDecor.swift`가 굽는 스트립의 크기와 같다. 두 곳이 갈리면 장식이
+     * 밴드에 맞춰 늘거나 줄어 비율이 뭉개진다. */
+    private static let topBandRatio: CGFloat = 190.0 / 1080
+    private static let bottomBandRatio: CGFloat = 150.0 / 1080
+
     static func render(_ request: CompositionRequest) -> UIImage {
         let frame = request.frame
         let width = request.outputWidth
@@ -45,16 +53,35 @@ enum CutCompositor {
 
         let scale = width / designWidth
         let hasFooter = frame.footer?.known == .logoDate
-        let footer = hasFooter ? footerHeight(scale: scale) : 0
+        /* 푸터도 **없어도 자리를 비운다.** 밴드와 같은 이유다 — 푸터 유무로 캔버스 길이가 갈리면
+         * `basic`처럼 스탬프 없는 프레임만 규격이 달라진다. 그리는 것만 조건부다. */
+        let footer = footerHeight(scale: scale)
+
+        /* 장식은 **자기 자리를 갖는다.** 사진 위에 얹으면 어느 컷이든 얼굴 위로 하트가 걸리고,
+         * 사진 모서리와 프레임이 어긋나 보인다(사용자 피드백 2026-08-25 — 포토매틱 스트립 참조).
+         *
+         *     [상단 밴드][padding][그리드][하단 밴드][푸터][padding]
+         *
+         * **장식이 없는 프레임도 같은 자리를 비운다.** 장식 있는 프레임만 캔버스가 길어지면, 같은
+         * 컷을 찍어도 프레임을 바꾸는 순간 결과물 규격과 사진 크기가 달라진다 — 화면에서는 세로로
+         * 긴 쪽이 높이에 맞춰 축소되어 가로까지 좁아 보인다(사용자 결정 2026-08-25).
+         *
+         * 그래서 밴드 높이가 그림이 아니라 **레이아웃 상수**다. 장식 그림은 이 비율에 맞춰
+         * 그려져 있다(`Scripts/frames/README.md`). */
+        let topBand = width * Self.topBandRatio
+        let bottomBand = width * Self.bottomBandRatio
 
         /* 그리드 비율은 템플릿이 정한다. 0.1.0은 컷 수와 무관하게 정사각이었다
          * (원본 `styles.grid: { aspectRatio: 1 }`). 서버 계약: `aspectRatio`·`slots`는
          * **컷 그리드 영역 기준**이며 프레임 여백과 푸터를 포함하지 않는다. */
         let gridWidth = width - padding * 2
         let gridHeight = gridWidth * CutGeometry.heightPerWidth(request.template.aspectRatio)
-        let canvas = CGSize(width: width, height: padding * 2 + gridHeight + footer)
+        let canvas = CGSize(
+            width: width,
+            height: topBand + padding * 2 + gridHeight + bottomBand + footer
+        )
 
-        let gridRect = CGRect(x: padding, y: padding, width: gridWidth, height: gridHeight)
+        let gridRect = CGRect(x: padding, y: topBand + padding, width: gridWidth, height: gridHeight)
         let cells = CutGeometry.cells(request.template.slots, in: gridRect, gutter: gutter)
 
         let format = UIGraphicsImageRendererFormat.default()
@@ -66,6 +93,10 @@ enum CutCompositor {
 
             cg.setFillColor(UIColor(hexString: frame.background).cgColor)
             cg.fill(CGRect(origin: .zero, size: canvas))
+
+            if let pattern = request.decor.pattern {
+                tile(pattern, scale: request.decor.patternScale, in: canvas)
+            }
 
             // 빈 슬롯 표시 — 프레임 색에서 파생시킨다. 이전 구현은 잉크 팔레트를 역참조해
             // 흰 프레임 위에 검은 구멍이 뚫렸다.
@@ -90,14 +121,51 @@ enum CutCompositor {
                 cg.restoreGState()
             }
 
+            // 장식은 자기 밴드 안에만 그린다 — 컷과 겹치지 않는다.
+            if let top = request.decor.top {
+                top.draw(in: CGRect(x: 0, y: 0, width: width, height: topBand))
+            }
+            if let bottom = request.decor.bottom {
+                bottom.draw(in: CGRect(x: 0, y: gridRect.maxY, width: width, height: bottomBand))
+            }
+
             if hasFooter {
                 drawFooter(
                     frame: frame,
                     date: request.stampDate,
                     scale: scale,
-                    in: CGRect(x: 0, y: padding + gridHeight, width: canvas.width, height: footer)
+                    in: CGRect(
+                        x: 0, y: gridRect.maxY + bottomBand, width: canvas.width, height: footer
+                    )
                 )
             }
+        }
+    }
+
+    // MARK: - 장식
+
+    /// 캔버스 폭에 맞춰 늘렸을 때의 높이. 폭 100%가 계약이라 좌우 여백은 그림이 갖는다.
+    private static func stripHeight(of image: UIImage, width: CGFloat) -> CGFloat? {
+        guard image.size.width > 0, image.size.height > 0 else { return nil }
+        return width * image.size.height / image.size.width
+    }
+
+    /* 배경 타일. 캔버스를 넘는 부분은 렌더러가 잘라 낸다 — 딱 떨어지지 않는 폭에서 마지막 열이
+     * 반쯤 잘리는 것이 타일의 정상 동작이라 맞춰 줄이지 않는다.
+     *
+     * 크기가 0이면 while이 끝나지 않는다. 서버 값이라 `assert`가 아니라 반환으로 막는다. */
+    private static func tile(_ image: UIImage, scale: CGFloat, in canvas: CGSize) {
+        let width = canvas.width * scale
+        guard width > 0, let height = stripHeight(of: image, width: width), height > 0 else { return }
+
+        var y: CGFloat = 0
+        while y < canvas.height {
+            var x: CGFloat = 0
+            while x < canvas.width {
+                image.draw(in: CGRect(x: x, y: y, width: width, height: height))
+                x += width
+            }
+            y += height
         }
     }
 

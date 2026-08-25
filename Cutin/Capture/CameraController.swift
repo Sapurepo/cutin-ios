@@ -62,6 +62,11 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     @ObservationIgnored private let sessionQueue = DispatchQueue(label: "io.cutin.camera.session")
     @ObservationIgnored private let photoOutput = AVCapturePhotoOutput()
+
+    /* 촬영 중 기록(§`MotionRecorder`). 세션에 붙지 못하는 기기·조합이 있을 수 있어
+     * `canAddOutput`이 거절하면 조용히 없는 기능이 된다 — 사진 경로는 그대로다. */
+    @ObservationIgnored private let motionOutput = AVCaptureVideoDataOutput()
+    let motion = MotionRecorder()
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     /// sessionQueue 전용 — 지금 붙어 있는 비디오 기기. 줌은 이 기기의 `videoZoomFactor`를 만진다.
@@ -130,6 +135,8 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
 
     func stop() {
+        // 화면을 벗어나면 녹화 중이던 구간은 의미가 없다.
+        motion.discard()
         shouldRun = false
         isRunning = false
         /* self를 강하게 잡는다. weak로 두면 sessionQueue가 바쁜 사이(configure·startRunning은
@@ -235,6 +242,13 @@ final class CameraController: NSObject, @unchecked Sendable {
             photoOutput.maxPhotoQualityPrioritization = .balanced
         }
 
+        if session.canAddOutput(motionOutput) {
+            // 늦은 프레임은 버린다. 밀린 프레임을 붙들면 셔터 응답이 함께 늦어진다.
+            motionOutput.alwaysDiscardsLateVideoFrames = true
+            motionOutput.setSampleBufferDelegate(motion, queue: motion.queue)
+            session.addOutput(motionOutput)
+        }
+
         session.commitConfiguration()
         applyConnectionSettings(front: front)
         return hasInput
@@ -276,15 +290,20 @@ final class CameraController: NSObject, @unchecked Sendable {
         ) ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
     }
 
-    /// 세로 고정 + 전면 미러링 — 원본의 `mirror={facing === "front"}` 대응.
+    /* 세로 고정 + 전면 미러링 — 원본의 `mirror={facing === "front"}` 대응.
+     *
+     * 영상 출력도 **같은 설정을 받아야 한다.** 사진만 돌리면 QR로 보는 영상이 눕고, 전면
+     * 미러링이 다르면 사진과 영상의 좌우가 뒤집혀 같은 순간으로 읽히지 않는다. */
     private func applyConnectionSettings(front: Bool) {
-        guard let connection = photoOutput.connection(with: .video) else { return }
-        if connection.isVideoRotationAngleSupported(90) {
-            connection.videoRotationAngle = 90
-        }
-        if connection.isVideoMirroringSupported {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = front
+        for connection in [photoOutput.connection(with: .video), motionOutput.connection(with: .video)] {
+            guard let connection else { continue }
+            if connection.isVideoRotationAngleSupported(90) {
+                connection.videoRotationAngle = 90
+            }
+            if connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = front
+            }
         }
     }
 
@@ -298,6 +317,8 @@ final class CameraController: NSObject, @unchecked Sendable {
             guard let self else { return }
             // 입력을 갈아치우면 진행 중인 촬영의 델리게이트를 기대할 수 없다.
             self.resolvePending(.failure(CaptureError.cancelled))
+            // 녹화 중이던 구간도 함께 버린다 — 좌우·화각이 중간에 바뀐 클립은 쓸 수 없다.
+            self.motion.discard()
 
             let previous = self.session.inputs
             self.session.beginConfiguration()

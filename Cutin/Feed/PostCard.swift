@@ -119,10 +119,12 @@ struct PostImage: View {
     var body: some View {
         RemoteImage(url: post.composed.flatMap { URL(string: $0.url) }, contentMode: .fit)
             .aspectRatio(ratio, contentMode: .fit)
-            .clipShape(.rect(cornerRadius: Radius.md))
             /* 합성본이 곧 카드다 — 배경에서 뜨게 한다. 흰 프레임(가장 흔하다)이 오프화이트 배경과
-             * 붙어 어디까지가 사진인지 안 보이던 것(감사·피드)을 그림자/헤어라인이 가른다. */
-            .raised(cornerRadius: Radius.md)
+             * 붙어 어디까지가 사진인지 안 보이던 것(감사·피드)을 그림자/헤어라인이 가른다.
+             *
+             * **모서리는 각지다.** 합성본은 사각형 파일이고, 프레임 여백이 얇으면 둥근 모서리가
+             * 코너에서 테두리를 먹는다(포토부스 스트립에서 특히 심했다). */
+            .raised(cornerRadius: 0)
     }
 }
 

@@ -21,6 +21,9 @@ struct FinishStepView: View {
 
     @FocusState private var isCaptionFocused: Bool
 
+    /// 방금 발행한 포스트. 값이 생기면 QR을 띄우고, 닫힐 때 촬영 화면을 접는다.
+    @State private var published: Post?
+
     var body: some View {
         VStack(spacing: Spacing.x5) {
             ComposePreview(flow: flow)
@@ -50,6 +53,9 @@ struct FinishStepView: View {
                 Spacer()
                 Button("완료") { isCaptionFocused = false }
             }
+        }
+        .sheet(item: $published) { post in
+            PostQRSheet(post: post, onClose: onSaved)
         }
     }
 
@@ -163,10 +169,13 @@ struct FinishStepView: View {
     private func save() {
         isCaptionFocused = false
         Task {
-            if await flow.commit(with: publisher, to: store) {
-                Haptics.success()   // 올라갔다 — 화면이 바로 닫히므로 손끝이 알려 준다
+            if let post = await flow.commit(with: publisher, to: store) {
+                Haptics.success()   // 올라갔다 — 손끝이 먼저 알려 준다
                 SoundEffects.success()
-                onSaved()
+                /* 바로 닫지 않고 QR을 보여준다. 방금 찍은 사람이 그 자리에서 옆 사람에게
+                 * 보여줄 수 있는 유일한 순간이고, 나중에 상세에서 다시 열 수는 있어도
+                 * "지금 보여줘"는 지금뿐이다. 닫으면 그때 촬영 화면을 접는다. */
+                published = post
             }
         }
     }

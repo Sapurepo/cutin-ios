@@ -34,6 +34,7 @@ final class PostPublisher {
         case uploadingCuts(done: Int, total: Int)
         case attachingCuts
         case uploadingComposed
+        case uploadingMotion
         case publishing
 
         var label: String? {
@@ -43,6 +44,7 @@ final class PostPublisher {
             case .uploadingCuts(let done, let total): return "컷 올리는 중 \(done)/\(total)"
             case .attachingCuts: return "컷 붙이는 중…"
             case .uploadingComposed: return "완성본 올리는 중…"
+            case .uploadingMotion: return "촬영 영상 올리는 중…"
             case .publishing: return "발행 중…"
             }
         }
@@ -66,6 +68,8 @@ final class PostPublisher {
         var cuts: [UIImage]
         /// 구워진 합성본. 서버는 다시 그리지 않고 이 바이트를 그대로 보관한다.
         var composed: UIImage
+        /// 이어 붙인 촬영 영상. 녹화가 없었으면 nil이다.
+        var motion: MotionComposer.Result?
         var caption: String
         var visibility: PostVisibility
         /// 대표 컷. nil이면 서버가 첫 컷을 쓴다(§6.3).
@@ -105,11 +109,22 @@ final class PostPublisher {
         step = .uploadingComposed
         let composed = try await uploader.upload(request.composed, kind: .composed)
 
+        /* 영상 업로드 실패는 **발행을 막지 않는다.** 사진은 이미 다 올라갔고, 여기서 던지면
+         * 네트워크가 잠깐 흔들렸다는 이유로 촬영 전체가 저장되지 않는다. QR에 영상이 없을 뿐이다. */
+        var motionMediaId: UUID?
+        if let motion = request.motion {
+            step = .uploadingMotion
+            motionMediaId = try? await uploader.upload(
+                videoAt: motion.url, width: motion.width, height: motion.height
+            ).id
+        }
+
         step = .publishing
         return try await client.send(
             .post, "/posts/\(draft.id.path)/publish",
             body: PublishPostBody(
                 composedMediaId: composed.id,
+                motionMediaId: motionMediaId,
                 visibility: ServerEnum(request.visibility),
                 // 대표 컷을 직접 골랐으면 고정(0.3.0 제품 결정) — 첫 컷을 골라도 고정이다.
                 pinned: request.thumbnailCutIndex != nil

@@ -65,7 +65,9 @@ private func frame(_ code: String, _ bg: String, _ fg: String,
         padding: ratio(stamped ? 12 : 4),
         gutter: ratio(stamped ? 8 : 4),
         cellRadius: ratio(stamped ? 2 : 3),
-        footer: stamped ? ServerEnum(.logoDate) : nil
+        footer: stamped ? ServerEnum(.logoDate) : nil,
+        // 장식은 서버 그림이라 프리뷰(네트워크 없음)에서는 늘 비어 있다.
+        decorTopUrl: nil, decorBottomUrl: nil, patternUrl: nil, patternScale: nil
     )
 }
 
