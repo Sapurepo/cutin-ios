@@ -99,6 +99,31 @@ final class CaptureFlow {
         persist(image, at: slot)
     }
 
+    /* 컷마다 셔터 직전에 기록된 클립. 발행 직전에 하나로 이어 붙인다(§`MotionComposer`).
+     *
+     * **draft에 남기지 않는다.** 앱이 죽으면 영상은 잃고 사진만 살아남는다 — 임시 폴더의 mp4를
+     * Documents로 옮겨 24시간 들고 있을 만큼 값진 데이터가 아니고, 이어 찍은 촬영의 앞부분
+     * 영상만 남는 상태가 더 이상하다. */
+    private(set) var motionClips: [Int: URL] = [:]
+
+    /// 촬영 순서대로 편 클립. 재촬영으로 교체된 것은 이미 새 파일이다.
+    var orderedMotionClips: [URL] { motionClips.sorted { $0.key < $1.key }.map(\.value) }
+
+    func setMotionClip(_ url: URL, at index: Int) {
+        // 재촬영이면 옛 파일이 남는다 — 임시 폴더라 언젠가 지워지지만 우리가 만든 것은 우리가 치운다.
+        if let previous = motionClips[index] {
+            try? FileManager.default.removeItem(at: previous)
+        }
+        motionClips[index] = url
+    }
+
+    private func discardMotionClips() {
+        for url in motionClips.values {
+            try? FileManager.default.removeItem(at: url)
+        }
+        motionClips = [:]
+    }
+
     func toggleRetake(_ index: Int) {
         retakeIndex = (retakeIndex == index) ? nil : index
     }
@@ -123,6 +148,7 @@ final class CaptureFlow {
      * 템플릿을 컷 수에 맞는 기본값으로 되돌렸는데, 컷 수 자체가 템플릿에서 나오는 지금
      * 그렇게 하면 방금 `configure`로 정한 선택을 지운다. 새 촬영의 템플릿은 호출부가 정한다. */
     private func wipe() {
+        discardMotionClips()
         cuts = []
         retakeIndex = nil
         cutsRevision += 1
@@ -203,9 +229,18 @@ final class CaptureFlow {
             template: template,
             frame: frame,
             filter: filterID,
+            decor: decor,
             stampDate: Date(),
             outputWidth: outputWidth
         )
+    }
+
+    /* 고른 프레임의 장식 그림. 합성기가 동기라 그리기 전에 받아 둬야 한다(§`FrameDecor`).
+     * 미리보기와 저장이 각자 부르지만 두 번째부터는 캐시에서 즉시 돌아온다. */
+    private(set) var decor: FrameDecor = .none
+
+    func loadDecor() async {
+        decor = await FrameDecorLoader.decor(for: frame)
     }
 
     // MARK: - 발행
@@ -244,24 +279,32 @@ final class CaptureFlow {
      * (`PostPublisher`), 그 순서와 진행 표시는 전부 발행기가 갖는다. 이 메서드가 하는 일은
      * **굽기 전에 메타데이터를 붙잡는 것**뿐이다 — 렌더는 200ms대가 걸리고 그 사이 사용자가
      * 뒤로 가 보정을 바꾸면, 올라간 그림과 올라간 캡션이 서로 다른 순간의 것이 된다. */
-    func commit(with publisher: PostPublisher, to store: PostStore) async -> Bool {
-        guard !publisher.isPublishing else { return false }
+    func commit(with publisher: PostPublisher, to store: PostStore) async -> Post? {
+        guard !publisher.isPublishing else { return nil }
         saveFailure = nil
+
+        // 미리보기가 이미 받아 뒀으면 즉시 돌아온다. 못 받았으면 장식 없이 굽는다 — 저장을 막지 않는다.
+        await loadDecor()
 
         guard let request = compositionRequest(outputWidth: CutCompositor.saveWidth),
               let template, let frame
         else {
             saveFailure = CommitFailure.templateMissing
-            return false
+            return nil
         }
         let bakedCuts = cuts
         let bakedCaption = caption
         let bakedVisibility = visibility
         let bakedThumbnail = thumbnailCutIndex
+        let clips = orderedMotionClips
 
         let baked = await Task.detached(priority: .userInitiated) {
             CutCompositor.render(request)
         }.value
+
+        /* 클립을 여기서 잇는다 — 촬영 중에 이으면 재촬영마다 다시 이어야 하고, 발행하지 않고
+         * 나가는 촬영에서는 그 일이 통째로 버려진다. 실패하면 영상 없이 간다(§`MotionComposer`). */
+        let motion = await MotionComposer.merge(clips)
 
         do {
             let post = try await publisher.publish(PostPublisher.Request(
@@ -269,6 +312,7 @@ final class CaptureFlow {
                 frame: frame,
                 cuts: bakedCuts,
                 composed: baked,
+                motion: motion,
                 caption: bakedCaption,
                 visibility: bakedVisibility,
                 thumbnailCutIndex: bakedThumbnail
@@ -277,11 +321,12 @@ final class CaptureFlow {
             /* 포스트가 됐으니 draft는 더 이상 미완료가 아니다(§6.4 "업로드 완료 시 draft 해제").
              * 여기서 지우지 않으면 다음 촬영이 이미 저장된 촬영에 막힌다. */
             discardDraft()
-            return true
+            if let motion { try? FileManager.default.removeItem(at: motion.url) }
+            return post
         } catch {
             // 실패했는데 피드로 넘어가면 사용자는 저장됐다고 믿는다.
             saveFailure = error
-            return false
+            return nil
         }
     }
 }

@@ -32,6 +32,7 @@ struct PostDetailView: View {
     @State private var notice: String?
     @State private var isSavingToPhotos = false
     @State private var shareURL: URL?
+    @State private var qrPost: Post?
     @State private var isReporting = false
 
     var body: some View {
@@ -101,6 +102,13 @@ struct PostDetailView: View {
                     } label: {
                         Label("공유", systemImage: "square.and.arrow.up")
                     }
+                    /* 링크를 보내는 것과 달리 QR은 **눈앞의 사람**에게 보여주는 수단이다.
+                     * 촬영 영상이 붙은 포스트에서 특히 그렇다(§`PostQRSheet`). */
+                    Button {
+                        qrPost = post
+                    } label: {
+                        Label("QR 코드", systemImage: "qrcode")
+                    }
                     Divider()
                     // 남의 포스트는 지울 수 없다 — 서버가 404를 내므로 버튼을 두면 거짓 약속이다.
                     if post.author.id == session.userId {
@@ -128,6 +136,7 @@ struct PostDetailView: View {
         .sheet(isPresented: $isReporting) {
             ReportSheet(targetType: .post, targetId: post.id)
         }
+        .sheet(item: $qrPost) { PostQRSheet(post: $0) }
         /* 링크가 준비되면 시스템 공유 시트를 띄운다. `ShareLink`는 값이 미리 있어야 해서
          * 왕복이 필요한 지금 구조에는 맞지 않는다. */
         .sheet(item: $shareURL) { url in

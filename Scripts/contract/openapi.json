@@ -564,6 +564,12 @@
                 "type": "string",
                 "format": "binary"
               }
+            },
+            "video/mp4": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
             }
           }
         },
@@ -610,7 +616,7 @@
         ]
       },
       "get": {
-        "description": "키에 소유자·미디어 id가 들어가 추측할 수 없으므로 인증을 요구하지 않는다. 응답은 JSON이 아니라 이미지 바이트다.",
+        "description": "키에 소유자·미디어 id가 들어가 추측할 수 없으므로 인증을 요구하지 않는다. 응답은 JSON이 아니라 파일 바이트다. `Range`를 보내면 206으로 그 구간만 돌려준다 — 브라우저의 영상 재생이 이것을 요구한다.",
         "operationId": "MediaController_readContent",
         "parameters": [
           {
@@ -644,6 +650,12 @@
                   "type": "string",
                   "format": "binary"
                 }
+              },
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
@@ -664,11 +676,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponseDto"
                 }
+              },
+              "video/mp4": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
               }
             }
           }
         },
-        "summary": "이미지 조회",
+        "summary": "미디어 조회",
         "tags": [
           "media"
         ]
@@ -783,6 +800,54 @@
           }
         ],
         "summary": "템플릿 목록",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
+    "/frames/assets/{name}": {
+      "get": {
+        "description": "프레임 목록이 주는 장식 URL이 가리키는 곳이다. 모두에게 같은 자산이라 인증을 요구하지 않는다.",
+        "operationId": "PostsController_readFrameAsset",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG 바이트",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상을 찾을 수 없음",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "프레임 장식 그림",
         "tags": [
           "posts"
         ]
@@ -1012,7 +1077,7 @@
     },
     "/users/{id}/posts": {
       "get": {
-        "description": "본인 id를 넣으면 기록 보관함이 된다. 노출 범위는 피드와 같은 규칙이다.",
+        "description": "본인 id를 넣으면 기록 보관함이 된다. 노출 범위는 피드와 같은 규칙이다. 고정(pinned)한 포스트가 맨 앞에 오고 그 안에서 발행 시각 역순이다.",
         "operationId": "PostsController_listByAuthor",
         "parameters": [
           {
@@ -1277,7 +1342,7 @@
         ]
       },
       "patch": {
-        "description": "cuts를 보내면 기존 컷을 전부 대체한다.",
+        "description": "cuts를 보내면 기존 컷을 전부 대체한다. 발행된 포스트는 thumbnailCutIndex(0 = 기본 첫 컷)와 pinned(프로필 맨 앞 고정)만 바꿀 수 있다 — 다른 필드가 섞이면 POST_NOT_DRAFT.",
         "operationId": "PostsController_updateDraft",
         "parameters": [
           {
@@ -1346,7 +1411,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "draft 편집",
+        "summary": "draft 편집 · 발행본은 대표 컷과 고정만",
         "tags": [
           "posts"
         ]
@@ -3186,7 +3251,8 @@
             "enum": [
               "cut",
               "composed",
-              "avatar"
+              "avatar",
+              "motion"
             ]
           },
           "mime": {
@@ -3194,7 +3260,8 @@
             "enum": [
               "image/jpeg",
               "image/png",
-              "image/heic"
+              "image/heic",
+              "video/mp4"
             ]
           }
         },
@@ -3269,7 +3336,8 @@
             "enum": [
               "cut",
               "composed",
-              "avatar"
+              "avatar",
+              "motion"
             ]
           },
           "url": {
@@ -3413,6 +3481,26 @@
                     null
                   ],
                   "nullable": true
+                },
+                "decorTopUrl": {
+                  "type": "string",
+                  "description": "캔버스 폭 100%로 늘려 위 가장자리에 앵커한다. 높이는 그림의 비율을 따른다.",
+                  "nullable": true
+                },
+                "decorBottomUrl": {
+                  "type": "string",
+                  "description": "아래 가장자리에 앵커한다.",
+                  "nullable": true
+                },
+                "patternUrl": {
+                  "type": "string",
+                  "description": "배경 위에 까는 타일.",
+                  "nullable": true
+                },
+                "patternScale": {
+                  "type": "number",
+                  "description": "타일 폭 ÷ 캔버스 폭. patternUrl이 있을 때만 의미가 있다.",
+                  "nullable": true
                 }
               },
               "required": [
@@ -3424,7 +3512,11 @@
                 "padding",
                 "gutter",
                 "cellRadius",
-                "footer"
+                "footer",
+                "decorTopUrl",
+                "decorBottomUrl",
+                "patternUrl",
+                "patternScale"
               ],
               "additionalProperties": false
             }
@@ -3579,6 +3671,26 @@
                   null
                 ],
                 "nullable": true
+              },
+              "decorTopUrl": {
+                "type": "string",
+                "description": "캔버스 폭 100%로 늘려 위 가장자리에 앵커한다. 높이는 그림의 비율을 따른다.",
+                "nullable": true
+              },
+              "decorBottomUrl": {
+                "type": "string",
+                "description": "아래 가장자리에 앵커한다.",
+                "nullable": true
+              },
+              "patternUrl": {
+                "type": "string",
+                "description": "배경 위에 까는 타일.",
+                "nullable": true
+              },
+              "patternScale": {
+                "type": "number",
+                "description": "타일 폭 ÷ 캔버스 폭. patternUrl이 있을 때만 의미가 있다.",
+                "nullable": true
               }
             },
             "required": [
@@ -3590,7 +3702,11 @@
               "padding",
               "gutter",
               "cellRadius",
-              "footer"
+              "footer",
+              "decorTopUrl",
+              "decorBottomUrl",
+              "patternUrl",
+              "patternScale"
             ],
             "additionalProperties": false,
             "description": "외형을 고르지 않았으면 null이다. 서버가 기본 외형으로 대신 채우지 않는다 — GET /frames의 첫 항목이 기본이다.",
@@ -3622,6 +3738,9 @@
             "maximum": 9007199254740991,
             "nullable": true
           },
+          "pinned": {
+            "type": "boolean"
+          },
           "cuts": {
             "type": "array",
             "items": {
@@ -3645,7 +3764,8 @@
                       "enum": [
                         "cut",
                         "composed",
-                        "avatar"
+                        "avatar",
+                        "motion"
                       ]
                     },
                     "url": {
@@ -3694,7 +3814,51 @@
                 "enum": [
                   "cut",
                   "composed",
-                  "avatar"
+                  "avatar",
+                  "motion"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "height": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "url",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "motion": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "cut",
+                  "composed",
+                  "avatar",
+                  "motion"
                 ]
               },
               "url": {
@@ -3804,8 +3968,10 @@
           "visibility",
           "caption",
           "thumbnailCutIndex",
+          "pinned",
           "cuts",
           "composed",
+          "motion",
           "publishedAt",
           "createdAt",
           "commentCount",
@@ -3950,6 +4116,26 @@
                         null
                       ],
                       "nullable": true
+                    },
+                    "decorTopUrl": {
+                      "type": "string",
+                      "description": "캔버스 폭 100%로 늘려 위 가장자리에 앵커한다. 높이는 그림의 비율을 따른다.",
+                      "nullable": true
+                    },
+                    "decorBottomUrl": {
+                      "type": "string",
+                      "description": "아래 가장자리에 앵커한다.",
+                      "nullable": true
+                    },
+                    "patternUrl": {
+                      "type": "string",
+                      "description": "배경 위에 까는 타일.",
+                      "nullable": true
+                    },
+                    "patternScale": {
+                      "type": "number",
+                      "description": "타일 폭 ÷ 캔버스 폭. patternUrl이 있을 때만 의미가 있다.",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -3961,7 +4147,11 @@
                     "padding",
                     "gutter",
                     "cellRadius",
-                    "footer"
+                    "footer",
+                    "decorTopUrl",
+                    "decorBottomUrl",
+                    "patternUrl",
+                    "patternScale"
                   ],
                   "additionalProperties": false,
                   "description": "외형을 고르지 않았으면 null이다. 서버가 기본 외형으로 대신 채우지 않는다 — GET /frames의 첫 항목이 기본이다.",
@@ -3993,6 +4183,9 @@
                   "maximum": 9007199254740991,
                   "nullable": true
                 },
+                "pinned": {
+                  "type": "boolean"
+                },
                 "cuts": {
                   "type": "array",
                   "items": {
@@ -4016,7 +4209,8 @@
                             "enum": [
                               "cut",
                               "composed",
-                              "avatar"
+                              "avatar",
+                              "motion"
                             ]
                           },
                           "url": {
@@ -4065,7 +4259,51 @@
                       "enum": [
                         "cut",
                         "composed",
-                        "avatar"
+                        "avatar",
+                        "motion"
+                      ]
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "url",
+                    "width",
+                    "height"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
+                "motion": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "cut",
+                        "composed",
+                        "avatar",
+                        "motion"
                       ]
                     },
                     "url": {
@@ -4175,8 +4413,10 @@
                 "visibility",
                 "caption",
                 "thumbnailCutIndex",
+                "pinned",
                 "cuts",
                 "composed",
+                "motion",
                 "publishedAt",
                 "createdAt",
                 "commentCount",
@@ -4234,7 +4474,11 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991,
+            "description": "발행 뒤에도 이 필드만은 바꿀 수 있다. 0 = 기본(첫 컷) = 고정 해제.",
             "nullable": true
+          },
+          "pinned": {
+            "type": "boolean"
           },
           "frameId": {
             "type": "string",
@@ -4276,6 +4520,12 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "motionMediaId": {
+            "description": "네컷을 찍는 동안 기록된 영상. 녹화에 실패했으면 없다 — 발행을 막지 않는다.",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "caption": {
             "type": "string",
             "maxLength": 500,
@@ -4293,6 +4543,9 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "pinned": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4575,6 +4828,13 @@
             "minLength": 1,
             "maxLength": 512
           },
+          "pushEnvironment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
           "timezone": {
             "type": "string"
           }
@@ -4582,6 +4842,7 @@
         "required": [
           "platform",
           "pushToken",
+          "pushEnvironment",
           "timezone"
         ]
       },
@@ -4599,6 +4860,13 @@
               "ios"
             ]
           },
+          "pushEnvironment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
           "timezone": {
             "type": "string"
           }
@@ -4606,6 +4874,7 @@
         "required": [
           "id",
           "platform",
+          "pushEnvironment",
           "timezone"
         ],
         "additionalProperties": false

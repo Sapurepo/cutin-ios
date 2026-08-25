@@ -55,6 +55,31 @@ struct MediaUploader: Sendable {
         )
     }
 
+    /* 파일에 있는 영상을 올린다. 이미지와 달리 메모리의 값이 아니라 파일이라 경로를 받는다 —
+     * 6초짜리 mp4를 `UIImage`처럼 다룰 방법이 없고, 다룰 이유도 없다(다시 인코딩하지 않는다).
+     *
+     * 크기를 인자로 받는 이유: `complete`가 요구하는 값은 **올린 바이트의 크기**이고, 그것을
+     * 아는 것은 파일을 만든 쪽(`MotionComposer`)이다. 여기서 다시 `AVAsset`을 열면 같은 값을
+     * 두 번 계산하면서 어긋날 여지만 생긴다. */
+    func upload(videoAt url: URL, width: Int, height: Int) async throws -> Media {
+        guard let data = try? Data(contentsOf: url) else {
+            throw UploadFailure.encodingFailed
+        }
+
+        let target = try await client.send(
+            .post, "/media/uploads",
+            body: CreateUploadBody(kind: ServerEnum(.motion), mime: ServerEnum(.mp4)),
+            as: UploadTarget.self
+        )
+        try await client.upload(data, to: target)
+
+        return try await client.send(
+            .post, "/media/\(target.mediaId.path)/complete",
+            body: CompleteUploadBody(width: width, height: height),
+            as: Media.self
+        )
+    }
+
     enum UploadFailure: LocalizedError {
         /// JPEG 인코딩 실패 — CIImage만 있고 CGImage가 없는 UIImage 등.
         case encodingFailed

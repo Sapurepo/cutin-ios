@@ -374,7 +374,27 @@ struct CaptureView: View {
         if flow.mode == .burst, flow.retakeIndex == nil {
             countdownTask = Task { await runBurst() }
         } else {
-            Task { await shoot() }
+            // 카운트다운이 없으므로 셔터를 누른 순간부터 기록한다 — 그만큼 클립이 짧다.
+            Task {
+                let slot = flow.retakeIndex ?? flow.cuts.count
+                camera.motion.begin()
+                await finishMotion(at: slot, captured: await shoot())
+            }
+        }
+    }
+
+    /* 셔터 앞뒤의 짧은 기록을 닫고 플로우에 넘긴다(§`MotionRecorder`).
+     *
+     * 셔터 뒤로 0.5초를 더 받는 이유: "찍혔다"를 알고 표정이 풀리는 순간이 이 영상의 재미다.
+     * 촬영이 실패했으면 버린다 — 사진 없는 컷의 영상은 자리도 없다. */
+    private func finishMotion(at slot: Int, captured: Bool) async {
+        guard captured else {
+            camera.motion.discard()
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+        if let clip = await camera.motion.end() {
+            flow.setMotionClip(clip, at: slot)
         }
     }
 
@@ -385,14 +405,22 @@ struct CaptureView: View {
                 if Task.isCancelled { break }
                 withAnimation { countdown = tick }
                 SoundEffects.tick(last: tick == 1)   // 카메라 앱의 타이머 소리 — 셔터는 시스템이 낸다
+                // 마지막 1초부터 기록한다. 셔터 뒤 0.5초까지 합쳐 컷당 1.5초 안팎이 된다.
+                if tick == 1 { camera.motion.begin() }
                 try? await Task.sleep(for: .seconds(1))
             }
-            if Task.isCancelled { break }
+            if Task.isCancelled {
+                camera.motion.discard()
+                break
+            }
             countdown = nil
 
             // 실패하면 멈춘다. 이전 구현은 실패를 삼키고 루프를 계속 돌아, 카메라가 못 찍는
             // 상황에서 컷 수가 늘지 않는 카운트다운을 영원히 반복했다.
-            guard await shoot() else { break }
+            let slot = flow.cuts.count
+            let captured = await shoot()
+            await finishMotion(at: slot, captured: captured)
+            guard captured else { break }
         }
         countdown = nil
     }

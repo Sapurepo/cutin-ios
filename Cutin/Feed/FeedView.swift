@@ -115,10 +115,11 @@ struct PostList<Empty: View>: View {
             VStack(spacing: Spacing.x8) {
                 ForEach(0..<2, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: Spacing.x3) {
-                        RoundedRectangle(cornerRadius: Radius.md)
+                        // 자리 모양은 실제 카드와 같아야 한다 — 카드가 각지므로 여기도 각지다.
+                        Rectangle()
                             .fill(palette.surfaceSunken)
                             .aspectRatio(3 / 4, contentMode: .fit)
-                            .overlay { Shimmer().clipShape(.rect(cornerRadius: Radius.md)) }
+                            .overlay { Shimmer() }
                         HStack(spacing: Spacing.x2) {
                             Circle().fill(palette.surfaceSunken).frame(width: 26, height: 26)
                             RoundedRectangle(cornerRadius: 4).fill(palette.surfaceSunken)

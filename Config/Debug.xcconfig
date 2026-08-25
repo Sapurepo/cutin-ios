@@ -2,4 +2,4 @@
 
 // 로컬 백엔드(`pnpm dev`, .env의 PORT=8000).
 // 슬래시는 Shared.xcconfig의 CUTIN_SLASH로 넣는다 — 이유는 그쪽 주석 참고.
-CUTIN_API_BASE_URL = http:$(CUTIN_SLASH)$(CUTIN_SLASH)172.30.1.16:8000
+CUTIN_API_BASE_URL = http:$(CUTIN_SLASH)$(CUTIN_SLASH)192.168.1.193:8000

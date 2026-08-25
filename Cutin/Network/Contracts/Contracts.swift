@@ -47,6 +47,8 @@ where Known.RawValue == String, Known: Hashable {
 
 enum MediaKind: String, Sendable, Hashable {
     case cut, composed, avatar
+    /// 네컷을 찍는 동안 기록된 영상. 합성본(`composed`)의 움직이는 짝이다.
+    case motion
 }
 
 enum PostStatus: String, Sendable, Hashable {
@@ -70,6 +72,8 @@ enum UploadMime: String, Sendable, Hashable {
     case jpeg = "image/jpeg"
     case png = "image/png"
     case heic = "image/heic"
+    /// `motion`만 쓴다. 서버가 종류와 형식의 짝을 검사한다(`MIME_KIND_MISMATCH`).
+    case mp4 = "video/mp4"
 }
 
 // MARK: - 인증
@@ -199,6 +203,22 @@ struct Frame: Codable, Sendable, Hashable {
     let cellRadius: Double
     /// null이면 푸터를 그리지 않는다.
     let footer: ServerEnum<Footer>?
+
+    /* 장식 그림. 색과 여백만으로는 표현할 수 없는 것(캐릭터·스티커·패턴)을 담는다.
+     *
+     * **nullable이 아니라 optional이다** — 장식을 모르는 서버(0.4.0 이하)가 키 자체를 빼고
+     * 내려보내도 프레임 목록 전체가 디코드에 실패하면 안 된다. 그때는 색만 있는 예전 프레임이
+     * 그대로 그려진다.
+     *
+     * 스트립은 **캔버스 폭 100%로 늘려 그리드 위/아래의 제 밴드에 놓인다**(컷 위에 겹치지
+     * 않는다). 밴드 높이는 그림의 비율이 정하므로 계약에 값이 없다 — 템플릿 비율이 달라져도
+     * 장식이 늘어나지 않는다. */
+    let decorTopUrl: String?
+    let decorBottomUrl: String?
+    /// 배경 위에 까는 타일.
+    let patternUrl: String?
+    /// 타일 폭 ÷ 캔버스 폭. `patternUrl`이 있을 때만 의미가 있다.
+    let patternScale: Double?
 }
 
 /* 페이징이 없다 — 목록이 8종이라 서버가 커서를 두지 않았다. 활성 항목만 내려오고
@@ -291,6 +311,9 @@ struct Post: Decodable, Sendable, Hashable {
     let cuts: [PostCut]
     /// **iOS가 만든 합성본.** draft에는 없으므로 null이다 — required이면서 nullable이다.
     let composed: Media?
+    /* 촬영 중 기록된 영상. 옵셔널인 이유가 둘이다: 녹화가 없었으면 서버가 null을 주고,
+     * 이 필드를 모르는 서버(0.4.0 이하)는 키 자체를 빼고 준다. */
+    let motion: Media?
     let publishedAt: String?
     let createdAt: String
     let commentCount: Int
@@ -336,6 +359,8 @@ struct PatchPostBody: Encodable, Sendable {
 
 struct PublishPostBody: Encodable, Sendable {
     let composedMediaId: UUID
+    /// 촬영 중 기록된 영상. 녹화에 실패했으면 키를 뺀다 — 발행을 막지 않는다.
+    var motionMediaId: UUID?
     var caption: Field<String>?
     var visibility: ServerEnum<PostVisibility>?
     var thumbnailCutIndex: Int?
